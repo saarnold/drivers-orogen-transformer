@@ -38,6 +38,12 @@ module TransformerPlugin
 	    task.input_port('static_transformations', '/std/vector</base/samples/RigidBodyState>')
 	    task.input_port('dynamic_transformations', '/base/samples/RigidBodyState').
 		needs_reliable_connection
+		
+	    task.hidden_operation("setFrameMapping", "    #{@transformer_name}.setFrameMapping(sourceFrame, mappedFrame);").
+		argument('sourceFrame', '/std/string').
+		argument('mappedFrame', '/std/string').
+		doc("Mappes 'sourceFrame' to 'mappedFrame' for all defined Transformations. This method may be called multiple times.")
+
 	end
 	
 	def generate_transformer_code(config)
