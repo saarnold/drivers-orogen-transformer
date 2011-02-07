@@ -48,7 +48,8 @@ module TransformerPlugin
 	
 	def generate_transformer_code(config)
 	    task.add_base_header_code("#include<transformer/Transformer.h>", true)
-	    task.add_base_member("transformer", transformer_name, "transformer::Transformer")
+	    #a_transformer to be shure that the transformer is declared BEFORE the Transformations
+	    task.add_base_member("a_transformer", transformer_name, "transformer::Transformer")
 
 	    task.in_base_hook("configure", "
     #{transformer_name}.setTimeout( base::Time::fromSeconds( _transformer_max_latency.value()) );
