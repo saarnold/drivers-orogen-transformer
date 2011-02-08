@@ -1,3 +1,4 @@
+require 'aggregator_plugin'
 
 module TransformerPlugin
     include AggregatorPlugin
