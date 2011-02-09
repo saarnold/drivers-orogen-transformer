@@ -17,7 +17,7 @@ module TransformerPlugin
 
 	    task.property("transformer_max_latency",   'double', config.max_latency).
 		doc "Maximum time that should be waited for a delayed data sample to arrive"
-	    puts("Adding property transformer_max_latency")
+	    Orocos::Generation.info("Adding property transformer_max_latency")
 
 	    #add period property for every data stream
 	    config.streams.each do |m|
@@ -25,7 +25,7 @@ module TransformerPlugin
 		if(!(task.find_property(property_name)))
 		    task.property(property_name,   'double', m.period).
 			doc "Time in s between #{m.name} readings"
-		    puts("Adding property #{property_name}")
+		    Orocos::Generation.info("Adding property #{property_name}")
 		end
 		
 		#push data in update hook
@@ -173,7 +173,6 @@ module TransformerPlugin
 	
 	#register code generator to be called after parsing is done
 	add_generation_handler do
-	    puts("test")
 	    gen.generate_transformer_code(config)
 	end
 
