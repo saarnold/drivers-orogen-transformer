@@ -77,7 +77,7 @@ module TransformerPlugin
     {
     const double #{s.name}Period = _#{s.name}_period.value();
     #{s.idx_name} = #{transformer_name}.registerDataStream< #{stream_data_type}>(
-		    base::Time::fromSeconds(#{s.name}Period), boost::bind( &TaskBase::#{s.callback_name}, this, _1, _2));
+		    base::Time::fromSeconds(#{s.name}Period), boost::bind( &#{task.class_name()}Base::#{s.callback_name}, this, _1, _2));
     }
 		")
 		
