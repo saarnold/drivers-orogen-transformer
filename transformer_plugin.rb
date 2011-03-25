@@ -1,5 +1,4 @@
 require 'aggregator_plugin'
-
 module TransformerPlugin
     include AggregatorPlugin
     
@@ -33,10 +32,10 @@ module TransformerPlugin
 		    "
 	#{transformer_name}.pushData(#{m.idx_name}, #{sample_name}.time, #{sample_name});"
 		end
-	    end
+	    end	    
 	    
 	    #create ports for transformations
-	    task.input_port('static_transformations', '/std/vector</base/samples/RigidBodyState>')
+	    task.input_port('static_transformations', '/base/samples/RigidBodyState')
 	    task.input_port('dynamic_transformations', '/base/samples/RigidBodyState').
 		needs_reliable_connection
 		
@@ -82,19 +81,16 @@ module TransformerPlugin
 		")
 		
 		task.in_base_hook("update", "
-    std::vector<base::samples::RigidBodyState> staticTransforms;
+    base::samples::RigidBodyState staticTransforms;
     while(_static_transformations.read(staticTransforms, false) == RTT::NewData) {
-	for(std::vector<base::samples::RigidBodyState>::const_iterator it = staticTransforms.begin(); it != staticTransforms.end(); it++)
-	{
-	    #{transformer_name}.pushStaticTransformation(*it);
-	}
+	#{transformer_name}.pushStaticTransformation(staticTransforms);
     }
 		                 
     base::samples::RigidBodyState dynamicTransform;
     while(_dynamic_transformations.read(dynamicTransform, false) == RTT::NewData) {
 	#{transformer_name}.pushDynamicTransformation(dynamicTransform);
-    }    
-		                  
+    }
+
     while(#{transformer_name}.step()) 
     {
 	;
