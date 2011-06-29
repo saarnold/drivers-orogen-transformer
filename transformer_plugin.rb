@@ -52,6 +52,7 @@ module TransformerPlugin
 	    task.add_base_member("a_transformer", transformer_name, "transformer::Transformer")
 
 	    task.in_base_hook("configure", "
+    #{transformer_name}.clear();
     #{transformer_name}.setTimeout( base::Time::fromSeconds( _transformer_max_latency.value()) );
 	    ")	    
 	    
@@ -79,8 +80,13 @@ module TransformerPlugin
 		    base::Time::fromSeconds(#{s.name}Period), boost::bind( &#{task.class_name()}Base::#{s.callback_name}, this, _1, _2));
     }
 		")
-		
-		task.in_base_hook("update", "
+
+		#unregister in cleanup
+		task.in_base_hook("cleanup", "
+    #{transformer_name}.unregisterDataStream(#{s.idx_name});")
+	    end
+
+	    task.in_base_hook("update", "
     base::samples::RigidBodyState staticTransforms;
     while(_static_transformations.read(staticTransforms, false) == RTT::NewData) {
 	#{transformer_name}.pushStaticTransformation(staticTransforms);
@@ -95,7 +101,10 @@ module TransformerPlugin
     {
 	;
     }")
-	    end
+	    
+	    #unregister in cleanup
+	    task.in_base_hook("stop", "
+    #{transformer_name}.clear();")
 	end
     end
     
