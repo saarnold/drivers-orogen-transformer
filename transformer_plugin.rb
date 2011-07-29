@@ -18,6 +18,12 @@ module TransformerPlugin
 		doc "Maximum time that should be waited for a delayed data sample to arrive"
 	    Orocos::Generation.info("Adding property transformer_max_latency")
 
+	    task.project.import_types_from('StreamAlignerStatus.hpp')
+
+	    #add output port for status information
+	    task.output_port("#{transformer_name}_status", '/aggregator/StreamAlignerStatus')
+	    Orocos::Generation.info("Adding port #{transformer_name}_status")
+	    
 	    #add period property for every data stream
 	    config.streams.each do |m|
 		property_name = "#{m.name}_period"
@@ -50,7 +56,8 @@ module TransformerPlugin
 	    task.add_base_header_code("#include<transformer/Transformer.h>", true)
 	    #a_transformer to be shure that the transformer is declared BEFORE the Transformations
 	    task.add_base_member("a_transformer", transformer_name, "transformer::Transformer")
-
+	    task.add_base_member("lastStatusTime", "_lastStatusTime", "base::Time")
+	    
 	    task.in_base_hook("configure", "
     #{transformer_name}.clear();
     #{transformer_name}.setTimeout( base::Time::fromSeconds( _transformer_max_latency.value()) );
@@ -101,7 +108,17 @@ module TransformerPlugin
     {
 	;
     }")
-	    
+
+	    task.in_base_hook('update', "
+    {
+	const base::Time curTime(base::Time::now());
+	if(curTime - _lastStatusTime > base::Time::fromSeconds(1))
+	{
+	    _lastStatusTime = curTime;
+	    _#{transformer_name}_status.write(#{transformer_name}.getStatus());
+	}
+    }")
+
 	    #unregister in cleanup
 	    task.in_base_hook("stop", "
     #{transformer_name}.clear();")
