@@ -18,7 +18,7 @@ module TransformerPlugin
 		doc "Maximum time that should be waited for a delayed data sample to arrive"
 	    Orocos::Generation.info("Adding property transformer_max_latency")
 
-	    task.project.import_types_from('StreamAlignerStatus.hpp')
+	    task.project.import_types_from('aggregator')
 
 	    #add output port for status information
 	    task.output_port("#{transformer_name}_status", '/aggregator/StreamAlignerStatus')
