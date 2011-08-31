@@ -13,7 +13,7 @@ module TransformerPlugin
 		end
 	    end	    
 	    
-	    task.add_base_header_code("#include<transformer/Transformer.h>", true)
+	    task.add_base_header_code("#include <transformer/Transformer.hpp>", true)
 	    #a_transformer to be shure that the transformer is declared BEFORE the Transformations
 	    task.add_base_member("a_transformer", config.name, "transformer::Transformer")
 	    task.add_base_member("lastStatusTime", "_lastStatusTime", "base::Time")
