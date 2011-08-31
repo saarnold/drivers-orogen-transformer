@@ -48,8 +48,8 @@ module TransformerPlugin
 
 
     std::vector<base::samples::RigidBodyState> const& staticTransforms =
-        _static_transforms.get();
-    for (int i = 0; i < staticTransforms.size(); ++i)
+        _static_transformations.set();
+    for (size_t i = 0; i < staticTransforms.size(); ++i)
         #{config.name}.pushStaticTransformation(staticTransforms[i]);
 		")
 
