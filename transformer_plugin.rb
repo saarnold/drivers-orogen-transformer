@@ -27,6 +27,12 @@ module TransformerPlugin
 		task.add_base_member("transformer", member_name(t), "transformer::Transformation &").
 		    initializer("#{member_name(t)}(#{config.name}.registerTransformation(\"#{t.from}\", \"#{t.to}\"))")
 	    end
+
+            task.in_base_hook("configure",
+"    std::vector<base::samples::RigidBodyState> const& staticTransforms =
+        _static_transformations.set();
+    for (size_t i = 0; i < staticTransforms.size(); ++i)
+        #{config.name}.pushStaticTransformation(staticTransforms[i]);")
 	    
 	    config.streams.each do |stream|
 		stream_data_type = type_cxxname(task, stream)
@@ -46,11 +52,6 @@ module TransformerPlugin
 		    base::Time::fromSeconds(#{stream.name}Period), boost::bind( &#{task.class_name()}Base::#{callback_name(stream)}, this, _1, _2));
     }
 
-
-    std::vector<base::samples::RigidBodyState> const& staticTransforms =
-        _static_transformations.set();
-    for (size_t i = 0; i < staticTransforms.size(); ++i)
-        #{config.name}.pushStaticTransformation(staticTransforms[i]);
 		")
 
 		#unregister in cleanup
