@@ -181,13 +181,15 @@ module TransformerPlugin
             available_frames.include?(frame_name)
         end
 
-        def associate_frame_to_port(frame_name, port_name)
-            if !task.has_port?(port_name)
-                raise ArgumentError, "task #{task.name} has no port called #{port_name}"
-            elsif !has_frame?(frame_name)
-                raise ArgumentError, "no frame #{frame_name} is declared"
+        def associate_frame_to_port(frame_name, port_names)
+            port_names.each do |pname|
+                if !task.has_port?(pname)
+                    raise ArgumentError, "task #{task.name} has no port called #{pname}"
+                elsif !has_frame?(frame_name)
+                    raise ArgumentError, "no frame #{frame_name} is declared"
+                end
+                frame_associations[pname] = frame_name
             end
-            frame_associations[port_name] = frame_name
         end
 
         def find_frame_of_port(port)
@@ -220,8 +222,12 @@ module TransformerPlugin
             end
 
             if port_frames
-                port_frames.each do |frame_name, port_name|
-                    associate_frame_to_port(frame_name, port_name)
+                port_frames.each do |frame_name, port_names|
+                    if !port_names.respond_to?(:to_ary)
+                        port_names = [port_names]
+                    end
+
+                    associate_frame_to_port(frame_name, port_names)
                 end
             end
         end
