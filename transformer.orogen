@@ -1,0 +1,16 @@
+name "transformer"
+
+import_types_from "base"
+
+typekit do
+    if type_export_policy == :used
+        # We assume that, if the caller wants a 'used' type policy, it means he
+        # wants partial exports. Move to 'selected'. oroGen would have changed
+        # it to 'all'
+        type_export_policy :selected
+    end
+
+    # This one is actually for the transformer plugin, but we want to avoid
+    # adding a new package just for that
+    export_types '/std/vector</base/samples/RigidBodyState>'
+end	
