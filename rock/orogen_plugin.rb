@@ -282,7 +282,7 @@ module TransformerPlugin
 
     def transformer(&block)
         if !block_given?
-            return extension("transformer")
+            return find_extension("transformer")
         end
 
 	PortListenerPlugin.add_to(self)
