@@ -182,6 +182,12 @@ module TransformerPlugin
             available_frames.include?(frame_name)
         end
 
+        def each_associated_port
+            frame_associations.each do |port_name, frame_name|
+                yield(task.find_port(port_name), frame_name)
+            end
+        end
+
         def associate_frame_to_port(frame_name, port_names)
             port_names.each do |pname|
                 if !task.has_port?(pname)
