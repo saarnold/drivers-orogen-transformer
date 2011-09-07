@@ -182,6 +182,14 @@ module TransformerPlugin
             available_frames.include?(frame_name)
         end
 
+        def each_frame(&block)
+            available_frames.each(&block)
+        end
+
+        def each_transformation(&block)
+            transformations.each(&block)
+        end
+
         def each_associated_port
             frame_associations.each do |port_name, frame_name|
                 yield(task.find_port(port_name), frame_name)
