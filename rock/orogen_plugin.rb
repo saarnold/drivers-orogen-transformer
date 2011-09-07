@@ -251,6 +251,9 @@ module TransformerPlugin
             if !available_frames.include?(from)
                 raise ArgumentError, "#{from} is not a declared frame"
             end
+            if !available_frames.include?(to)
+                raise ArgumentError, "#{to} is not a declared frame"
+            end
 	    transformations.push(TransformationDescription.new(from, to))
 	end
 	
