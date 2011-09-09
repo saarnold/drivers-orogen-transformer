@@ -2,16 +2,16 @@ require 'aggregator_plugin'
 
 module TransformerPlugin
     class Generator
+        def generate_frame_mapping(task, config)
+            transform_configuration = config.available_frames.map do |frame_name|
+                "    #{config.name}.setFrameMapping(\"#{frame_name}\", _#{frame_name});"
+            end
+
+            task.in_base_hook("start", transform_configuration.join("\n"))
+        end
+
 	def generate(task, config)
             port_listener_ext = task.extension("port_listener")
-
-	    config.streams.each do |stream|
-		#push data in update hook
-		port_listener_ext.add_port_listener(stream.name) do |sample_name|
-		    "
-	#{config.name}.pushData(#{idx_name(stream)}, #{sample_name}.time, #{sample_name});"
-		end
-	    end	    
 	    
 	    task.add_base_header_code("#include <transformer/Transformer.hpp>", true)
 	    #a_transformer to be shure that the transformer is declared BEFORE the Transformations
@@ -23,18 +23,26 @@ module TransformerPlugin
     #{config.name}.setTimeout( base::Time::fromSeconds( _transformer_max_latency.value()) );
 	    ")	    
 	    
-	    config.transformations.each do |t|
+	    config.each_needed_transformation.each do |t|
 		task.add_base_member("transformer", member_name(t), "transformer::Transformation &").
 		    initializer("#{member_name(t)}(#{config.name}.registerTransformation(\"#{t.from}\", \"#{t.to}\"))")
 	    end
 
-            task.in_base_hook("configure",
+            generate_frame_mapping(task, config)
+
+            task.in_base_hook("start",
 "    std::vector<base::samples::RigidBodyState> const& staticTransforms =
         _static_transformations.set();
-    for (size_t i = 0; i < staticTransforms.size(); ++i)
-        #{config.name}.pushStaticTransformation(staticTransforms[i]);")
-	    
+     for (size_t i = 0; i < staticTransforms.size(); ++i)
+        #{config.name}.pushStaticTransformation(staticTransforms[i]);
+")
+
 	    config.streams.each do |stream|
+		# Pull the data in the update hook
+		port_listener_ext.add_port_listener(stream.name) do |sample_name|
+                    "	#{config.name}.pushData(#{idx_name(stream)}, #{sample_name}.time, #{sample_name});"
+		end
+
 		stream_data_type = type_cxxname(task, stream)
 		
 		#add variable for index
@@ -50,13 +58,10 @@ module TransformerPlugin
     const double #{stream.name}Period = _#{stream.name}_period.value();
     #{idx_name(stream)} = #{config.name}.registerDataStream< #{stream_data_type}>(
 		    base::Time::fromSeconds(#{stream.name}Period), boost::bind( &#{task.class_name()}Base::#{callback_name(stream)}, this, _1, _2));
-    }
-
-		")
+    }")
 
 		#unregister in cleanup
-		task.in_base_hook("cleanup", "
-    #{config.name}.unregisterDataStream(#{idx_name(stream)});")
+		task.in_base_hook("cleanup", "     #{config.name}.unregisterDataStream(#{idx_name(stream)});")
 	    end
 
 	    task.in_base_hook("update", "
@@ -142,6 +147,19 @@ module TransformerPlugin
 		@to = to
 	    end
 	end
+
+        # Describes a transformation
+	class TransformationPort
+	    attr_reader :from
+	    attr_reader :to
+            attr_reader :port_name
+	    
+	    def initialize(from, to, port_name)
+		@from = from
+		@to = to
+                @port_name = port_name
+	    end
+	end
 	
 	dsl_attribute :name do |new_name|
             new_name = new_name.to_str
@@ -153,24 +171,31 @@ module TransformerPlugin
         end
 
         attr_predicate :default?, true
+        attr_predicate :producer?, true
+        attr_predicate :consumer?, true
 
         attr_reader :task
 
 	dsl_attribute :max_latency
 	attr_reader :streams
-	attr_reader :transformations
         attr_reader :available_frames
         attr_reader :frame_associations
+	attr_reader :needed_transformations
+        attr_reader :transform_inputs
+        attr_reader :transform_outputs
 
 	def initialize(task)
             @task = task
 
 	    @streams = Array.new()
-	    @transformations = Array.new()
             @name = "transformer"
             @default = true
             @available_frames = Set.new
             @frame_associations = Hash.new
+
+	    @needed_transformations = Array.new
+            @transform_outputs = Hash.new
+            @transform_inputs  = Hash.new
 	end
 	
 	def align_port(name, period)
@@ -186,14 +211,57 @@ module TransformerPlugin
             available_frames.each(&block)
         end
 
-        def each_transformation(&block)
-            transformations.each(&block)
+        def each_transform_output(&block)
+            transform_outputs.each(&block)
         end
 
-        def each_associated_port
-            frame_associations.each do |port_name, frame_name|
-                yield(task.find_port(port_name), frame_name)
+        def each_transform_input(&block)
+            transform_inputs.each(&block)
+        end
+
+        def each_transform_port(&block)
+            if !block
+                return enum_for(:each_transform_port)
             end
+            transform_inputs.each(&block)
+            transform_outputs.each(&block)
+        end
+
+        def each_needed_transformation(&block)
+            needed_transformations.each(&block)
+        end
+
+        def each_transformation(&block)
+            if !block_given?
+                return enum_for(:each_transformation)
+            end
+
+            seen = Set.new
+            needed_transformations.each do |trsf|
+                key = [trsf.from, trsf.to]
+                if !seen.include?(key)
+                    seen << key
+                    yield(trsf)
+                end
+            end
+            transform_inputs.each_value do |trsf|
+                key = [trsf.from, trsf.to]
+                if !seen.include?(key)
+                    seen << key
+                    yield(trsf)
+                end
+            end
+            transform_outputs.each_value do |trsf|
+                key = [trsf.from, trsf.to]
+                if !seen.include?(key)
+                    seen << key
+                    yield(trsf)
+                end
+            end
+        end
+
+        def each_annotated_port(&block)
+            frame_associations.each(&block)
         end
 
         def associate_frame_to_port(frame_name, port_names)
@@ -203,7 +271,7 @@ module TransformerPlugin
                 elsif !has_frame?(frame_name)
                     raise ArgumentError, "no frame #{frame_name} is declared"
                 end
-                frame_associations[pname] = frame_name
+                frame_associations[task.find_port(pname)] = frame_name
             end
         end
 
@@ -218,7 +286,7 @@ module TransformerPlugin
         def frame_of_port(port)
             if result = find_frame_of_port(port)
                 return result
-            else raise ArgumentError, "#{port} has no associated frame"
+            else raise ArgumentError, "#{port} has no frame annotation"
             end
         end
 
@@ -254,10 +322,67 @@ module TransformerPlugin
             if !available_frames.include?(to)
                 raise ArgumentError, "#{to} is not a declared frame"
             end
-	    transformations.push(TransformationDescription.new(from, to))
+	    needed_transformations.push(TransformationDescription.new(from, to))
 	end
-	
+
+        def transform_input(port_name, transform)
+            if !task.has_input_port?(port_name)
+                raise ArgumentError, "task #{task.name} has no input port called #{pname}"
+            end
+            spec = transform_port(port_name, transform)
+            transform_inputs[task.find_input_port(port_name)] = spec
+        end
+
+        def transform_output(port_name, transform)
+            if !task.has_output_port?(port_name)
+                raise ArgumentError, "task #{task.name} has no output port called #{pname}"
+            end
+            spec = transform_port(port_name, transform)
+            transform_outputs[task.find_output_port(port_name)] = spec
+        end
+
+        def transform_port(port_name, transform)
+            if !transform.kind_of?(Hash)
+                raise ArgumentError, "expected 'produces port_name, from => to', but got #{transform} instead of from => to"
+            elsif transform.size > 1
+                raise ArgumentError, "more than one transformation provided as production of port #{port_name}"
+            end
+            from, to = *transform.to_a.first
+
+            if !available_frames.include?(from)
+                raise ArgumentError, "#{from} is not a declared frame"
+            elsif !available_frames.include?(to)
+                raise ArgumentError, "#{to} is not a declared frame"
+            elsif !task.has_port?(port_name)
+                raise ArgumentError, "task #{task.name} has no port called #{pname}"
+            elsif (p = task.find_output_port(port_name)) && (p.type_name != "/base/samples/RigidBodyState")
+                raise ArgumentError, "port #{port_name} of task #{task.name} has wrong type: expected /base/samples/RigidBodyState, got #{p.type_name}"
+            end
+
+            TransformationPort.new(from, to, task.find_port(port_name))
+        end
+
+        def needs_transformer?
+            !needed_transformations.empty?
+        end
+
         def update_spec
+            task.project.import_types_from "base"
+
+            each_frame do |frame_name|
+                if !task.has_property?("#{frame_name}_frame")
+                    task.property("#{frame_name}_frame", "/std/string", frame_name).
+                        doc("the global name that should be used for the internal #{frame_name} frame")
+                end
+            end
+
+            if needs_transformer?
+                update_transformer_spec
+            end
+        end
+
+        def update_transformer_spec
+            task.project.import_types_from "base"
 	    task.project.using_library('transformer', :typekit => false)
 
 	    task.property("transformer_max_latency", 'double', max_latency).
@@ -293,7 +418,21 @@ module TransformerPlugin
         end
 
         def register_for_generation(task)
-            Generator.new.generate(task, self)
+            if !consumer? && producer?
+                Generator.new.generate_frame_mapping(task, self)
+            elsif consumer?
+                Generator.new.generate(task, self)
+            end
+        end
+
+        def self.create_extension(task, &block)
+            PortListenerPlugin.add_to(task)
+
+
+            config = task.find_extension("transformer") ||
+                TransformerPlugin::Extension.new(task)
+            config.instance_eval(&block)
+            config
         end
     end
 
@@ -302,15 +441,11 @@ module TransformerPlugin
             return find_extension("transformer")
         end
 
-	PortListenerPlugin.add_to(self)
-
-	config = TransformerPlugin::Extension.new(self)
-	config.instance_eval(&block)
-	if !config.max_latency
-	   raise "not max_latency specified for transformer" 
-	end
-	
+        config = Extension.create_extension(self, &block)
         config.update_spec
+        if config.needs_transformer? && !config.max_latency
+            raise "not max_latency specified for transformer" 
+        end
         register_extension("transformer", config)
     end
 end
