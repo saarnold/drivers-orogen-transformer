@@ -260,6 +260,22 @@ module TransformerPlugin
             end
         end
 
+        def find_transform_of_port(port)
+            if port.respond_to?(:to_str)
+                port = task.find_port(port)
+            end
+
+            transform_inputs[port] || transform_outputs[port]
+        end
+
+        def transform_of_port(port)
+            if result = find_transform_of_port(port)
+                result
+            else
+                raise ArgumentError, "port #{port} has no associated transformation"
+            end
+        end
+
         def each_annotated_port(&block)
             frame_associations.each(&block)
         end
