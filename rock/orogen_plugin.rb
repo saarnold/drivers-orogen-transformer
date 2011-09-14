@@ -287,7 +287,17 @@ module TransformerPlugin
                 elsif !has_frame?(frame_name)
                     raise ArgumentError, "no frame #{frame_name} is declared"
                 end
-                frame_associations[task.find_port(pname)] = frame_name
+                port = task.find_port(pname)
+                # WARN: do not verify here that +port+ is NOT of type
+                # RigidBodyState. The reason is that some components will
+                # provide transformations between two temporal states of the
+                # same frame, and for those it is actually useful to associate
+                # them with said frame.
+                #
+                # I.e., for instance, odometry modules provide "incremental
+                # updates", which are the transformations between the odometry
+                # frame at t and the odometry frame at t+1
+                frame_associations[port] = frame_name
             end
         end
 
@@ -370,12 +380,15 @@ module TransformerPlugin
             elsif !available_frames.include?(to)
                 raise ArgumentError, "#{to} is not a declared frame"
             elsif !task.has_port?(port_name)
-                raise ArgumentError, "task #{task.name} has no port called #{pname}"
-            elsif (p = task.find_output_port(port_name)) && (p.type_name != "/base/samples/RigidBodyState")
-                raise ArgumentError, "port #{port_name} of task #{task.name} has wrong type: expected /base/samples/RigidBodyState, got #{p.type_name}"
+                raise ArgumentError, "task #{task.name} has no port called #{port_name}"
             end
 
-            TransformationPort.new(from, to, task.find_port(port_name))
+            p = task.find_port(port_name)
+            if !Transformer.transform_port?(p)
+                raise ArgumentError, "port #{port_name} (#{p.type.name}) of task #{task.name} does not have a type compatible with being a transformation input or output"
+            end
+
+            TransformationPort.new(from, to, p)
         end
 
         def needs_transformer?
