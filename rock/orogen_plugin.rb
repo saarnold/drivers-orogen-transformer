@@ -444,9 +444,46 @@ module TransformerPlugin
             end
         end
 
-        def self.create_extension(task, &block)
+        # Called by Orocos::Spec::TaskContext#pretty_print to pretty-print the
+        # transformer configuration
+        def pretty_print(pp)
+            pp.text "Frames: #{available_frames.to_a.sort.join(", ")}"
 
+            pp.breakable
+            pp.text "Needed Transformations:"
+            transforms = each_transformation.map { |tr| [tr.from, tr.to] }.sort
+            if !transforms.empty?
+                pp.nest(2) do
+                    pp.breakable
+                    pp.seplist(transforms) do |tr|
+                        pp.text "%s => %s" % tr
+                    end
+                end
+            end
 
+            pp.breakable
+            pp.text "Frame/Port Associations:"
+            associations = each_annotated_port.map { |port, frame| [port.name, frame] }.sort
+            if !associations.empty?
+                pp.nest(2) do
+                    pp.breakable
+                    pp.seplist(associations) do |portdef|
+                        pp.text "data of %s is in frame %s" % portdef
+                    end
+                end
+            end
+
+            pp.breakable
+            pp.text "Transform Inputs and Outputs:"
+            ports = each_transform_port.map { |port, transform| [port.name, transform.from, transform.to] }.sort
+            if !ports.empty?
+                pp.nest(2) do
+                    pp.breakable
+                    pp.seplist(ports) do |portdef|
+                        pp.text "%s: %s => %s" % portdef
+                    end
+                end
+            end
         end
     end
 end
