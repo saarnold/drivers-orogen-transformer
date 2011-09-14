@@ -398,39 +398,42 @@ module TransformerPlugin
         end
 
         def update_transformer_spec
-            task.project.import_types_from "base"
-	    task.project.using_library('transformer', :typekit => false)
+            # Don't add the general stuff if it has already been added
+            if !task.has_property?("transformer_max_latency")
+                task.project.import_types_from "base"
+                task.project.using_library('transformer', :typekit => false)
 
-	    task.property("transformer_max_latency", 'double', max_latency).
-		doc "Maximum time in seconds the transformer will wait until it starts dropping samples"
-	    Orocos::Generation.info("transformer: adding property transformer_max_latency to #{task.name}")
+                task.property("transformer_max_latency", 'double', max_latency).
+                    doc "Maximum time in seconds the transformer will wait until it starts dropping samples"
+                Orocos::Generation.info("transformer: adding property transformer_max_latency to #{task.name}")
 
-	    task.project.import_types_from('aggregator')
+                task.project.import_types_from('aggregator')
 
-	    #add output port for status information
-	    task.output_port("#{self.name}_status", '/aggregator/StreamAlignerStatus')
-	    Orocos::Generation.info("transformer: adding port #{name}_status to #{task.name}")
-	    
-	    #add period property for every data stream
-	    streams.each do |stream|
-		property_name = "#{stream.name}_period"
-		if !task.find_property(property_name)
-		    task.property(property_name,   'double', stream.period).
-			doc "Time in s between #{stream.name} readings"
-		    Orocos::Generation.info("transformer: adding property #{property_name} to #{task.name}")
-		end
-	    end	    
-	    
-	    #create ports for transformations
-	    task.property('static_transformations', 'std::vector</base/samples/RigidBodyState>').
-                doc "list of static transformations"
-	    task.input_port('dynamic_transformations', '/base/samples/RigidBodyState').
-		needs_reliable_connection
-		
-	    task.hidden_operation("setFrameMapping", "    #{self.name}.setFrameMapping(sourceFrame, mappedFrame);").
-		argument('sourceFrame', '/std/string').
-		argument('mappedFrame', '/std/string').
-		doc("Maps the local frame name 'sourceFrame' to a global 'mappedFrame'. This method may be called multiple times.")
+                #add output port for status information
+                task.output_port("#{self.name}_status", '/aggregator/StreamAlignerStatus')
+                Orocos::Generation.info("transformer: adding port #{name}_status to #{task.name}")
+                
+                #create ports for transformations
+                task.property('static_transformations', 'std::vector</base/samples/RigidBodyState>').
+                    doc "list of static transformations"
+                task.input_port('dynamic_transformations', '/base/samples/RigidBodyState').
+                    needs_reliable_connection
+                    
+                task.hidden_operation("setFrameMapping", "    #{self.name}.setFrameMapping(sourceFrame, mappedFrame);").
+                    argument('sourceFrame', '/std/string').
+                    argument('mappedFrame', '/std/string').
+                    doc("Maps the local frame name 'sourceFrame' to a global 'mappedFrame'. This method may be called multiple times.")
+            end
+                
+            #add period property for every data stream
+            streams.each do |stream|
+                property_name = "#{stream.name}_period"
+                if !task.find_property(property_name)
+                    task.property(property_name,   'double', stream.period).
+                        doc "Time in s between #{stream.name} readings"
+                    Orocos::Generation.info("transformer: adding property #{property_name} to #{task.name}")
+                end
+            end	    
         end
 
         def register_for_generation(task)
@@ -442,31 +445,30 @@ module TransformerPlugin
         end
 
         def self.create_extension(task, &block)
-            PortListenerPlugin.add_to(task)
 
 
-            config = task.find_extension("transformer") ||
-                TransformerPlugin::Extension.new(task)
-            config.instance_eval(&block)
-            config
         end
-    end
-
-    def transformer(&block)
-        if !block_given?
-            return find_extension("transformer")
-        end
-
-        config = Extension.create_extension(self, &block)
-        config.update_spec
-        if config.needs_transformer? && !config.max_latency
-            raise "not max_latency specified for transformer" 
-        end
-        register_extension("transformer", config)
     end
 end
 
 
 class Orocos::Spec::TaskContext
-    include TransformerPlugin
+    def transformer(&block)
+        if !block_given?
+            return find_extension("transformer")
+        end
+
+        if !(config = find_extension("transformer"))
+            config = TransformerPlugin::Extension.new(self)
+            PortListenerPlugin.add_to(self)
+        end
+
+        config.instance_eval(&block)
+        if config.needs_transformer? && !config.max_latency
+            raise "not max_latency specified for transformer" 
+        end
+
+        config.update_spec
+        register_extension("transformer", config)
+    end
 end
