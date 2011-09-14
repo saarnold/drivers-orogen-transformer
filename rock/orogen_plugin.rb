@@ -302,10 +302,9 @@ module TransformerPlugin
         end
 
         def find_frame_of_port(port)
-            port = if port.respond_to?(:name) then port.name
-                   else port
-                   end
-
+            if port.respond_to?(:to_str)
+                port = task.find_port(port)
+            end
             @frame_associations[port]
         end
 
