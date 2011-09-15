@@ -2,14 +2,6 @@ require 'aggregator_plugin'
 
 module TransformerPlugin
     class Generator
-        def generate_frame_mapping(task, config)
-            transform_configuration = config.available_frames.map do |frame_name|
-                "    _#{config.name}.setFrameMapping(\"#{frame_name}\", _#{frame_name});"
-            end
-
-            task.in_base_hook("start", transform_configuration.join("\n"))
-        end
-
 	def generate(task, config)
             port_listener_ext = task.extension("port_listener")
 	    
@@ -19,8 +11,8 @@ module TransformerPlugin
 	    task.add_base_member("lastStatusTime", "_lastStatusTime", "base::Time")
 	    
 	    task.in_base_hook("configure", "
-    #{config.name}.clear();
-    #{config.name}.setTimeout( base::Time::fromSeconds( _transformer_max_latency.value()) );
+    _#{config.name}.clear();
+    _#{config.name}.setTimeout( base::Time::fromSeconds( _transformer_max_latency.value()) );
 	    ")	    
 	    
 	    config.each_needed_transformation.each do |t|
@@ -28,7 +20,11 @@ module TransformerPlugin
 		    initializer("#{member_name(t)}(_#{config.name}.registerTransformation(\"#{t.from}\", \"#{t.to}\"))")
 	    end
 
-            generate_frame_mapping(task, config)
+            # Apply the frame selection from the properties inside the startHook
+            frame_selection = config.each_dynamically_mapped_frame.map do |frame_name|
+                "    _#{config.name}.setFrameMapping(\"#{frame_name}\", _#{frame_name}_frame);"
+            end
+            task.in_base_hook("start", frame_selection.join("\n"))
 
             task.in_base_hook("start",
 "    std::vector<base::samples::RigidBodyState> const& staticTransforms =
@@ -171,8 +167,6 @@ module TransformerPlugin
         end
 
         attr_predicate :default?, true
-        attr_predicate :producer?, true
-        attr_predicate :consumer?, true
 
         attr_reader :task
 
@@ -208,6 +202,10 @@ module TransformerPlugin
         end
 
         def each_frame(&block)
+            available_frames.each(&block)
+        end
+        
+        def each_dynamicall_mapped_frame(&block)
             available_frames.each(&block)
         end
 
@@ -383,14 +381,14 @@ module TransformerPlugin
             TransformationPort.new(from, to, p)
         end
 
-        def needs_transformer?
-            !needed_transformations.empty?
-        end
-
+        # Called to add the interface objects required by the transformer
+        #
+        # It can be called repeatedly, in which case only the new elements will
+        # be added
         def update_spec
             task.project.import_types_from "base"
 
-            each_frame do |frame_name|
+            each_dynamically_mapped_frame do |frame_name|
                 if !task.has_property?("#{frame_name}_frame")
                     task.property("#{frame_name}_frame", "/std/string", frame_name).
                         doc("the global name that should be used for the internal #{frame_name} frame")
@@ -402,6 +400,10 @@ module TransformerPlugin
             end
         end
 
+        # Called to add the interface objects required by the transformer
+        #
+        # It can be called repeatedly, in which case only the new elements will
+        # be added
         def update_transformer_spec
             # Don't add the general stuff if it has already been added
             if !task.has_property?("transformer_max_latency")
@@ -436,10 +438,22 @@ module TransformerPlugin
             end	    
         end
 
+        # Lists the frames for which a configuration interface should be
+        # provided
+        def each_dynamically_mapped_frame(&block)
+            each_frame(&block)
+        end
+
+        # True if the task implementation will need a transformer infrastructure
+        # to deal with the declared transformations
+        def needs_transformer?
+            !needed_transformations.empty?
+        end
+
+        # Called by the oroGen C++ code generator to add code objects to the
+        # task implementation
         def register_for_generation(task)
-            if !consumer? && producer?
-                Generator.new.generate_frame_mapping(task, self)
-            elsif consumer?
+            if needs_transformer?
                 Generator.new.generate(task, self)
             end
         end
