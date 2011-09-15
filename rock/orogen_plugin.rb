@@ -4,7 +4,7 @@ module TransformerPlugin
     class Generator
         def generate_frame_mapping(task, config)
             transform_configuration = config.available_frames.map do |frame_name|
-                "    #{config.name}.setFrameMapping(\"#{frame_name}\", _#{frame_name});"
+                "    _#{config.name}.setFrameMapping(\"#{frame_name}\", _#{frame_name});"
             end
 
             task.in_base_hook("start", transform_configuration.join("\n"))
@@ -15,7 +15,7 @@ module TransformerPlugin
 	    
 	    task.add_base_header_code("#include <transformer/Transformer.hpp>", true)
 	    #a_transformer to be shure that the transformer is declared BEFORE the Transformations
-	    task.add_base_member("a_transformer", config.name, "transformer::Transformer")
+	    task.add_base_member("transformer", "_#{config.name}", "transformer::Transformer")
 	    task.add_base_member("lastStatusTime", "_lastStatusTime", "base::Time")
 	    
 	    task.in_base_hook("configure", "
@@ -25,7 +25,7 @@ module TransformerPlugin
 	    
 	    config.each_needed_transformation.each do |t|
 		task.add_base_member("transformer", member_name(t), "transformer::Transformation &").
-		    initializer("#{member_name(t)}(#{config.name}.registerTransformation(\"#{t.from}\", \"#{t.to}\"))")
+		    initializer("#{member_name(t)}(_#{config.name}.registerTransformation(\"#{t.from}\", \"#{t.to}\"))")
 	    end
 
             generate_frame_mapping(task, config)
@@ -34,13 +34,13 @@ module TransformerPlugin
 "    std::vector<base::samples::RigidBodyState> const& staticTransforms =
         _static_transformations.set();
      for (size_t i = 0; i < staticTransforms.size(); ++i)
-        #{config.name}.pushStaticTransformation(staticTransforms[i]);
+        _#{config.name}.pushStaticTransformation(staticTransforms[i]);
 ")
 
 	    config.streams.each do |stream|
 		# Pull the data in the update hook
 		port_listener_ext.add_port_listener(stream.name) do |sample_name|
-                    "	#{config.name}.pushData(#{idx_name(stream)}, #{sample_name}.time, #{sample_name});"
+                    "	_#{config.name}.pushData(#{idx_name(stream)}, #{sample_name}.time, #{sample_name});"
 		end
 
 		stream_data_type = type_cxxname(task, stream)
@@ -56,21 +56,21 @@ module TransformerPlugin
 		task.in_base_hook("configure", "
     {
     const double #{stream.name}Period = _#{stream.name}_period.value();
-    #{idx_name(stream)} = #{config.name}.registerDataStream< #{stream_data_type}>(
+    #{idx_name(stream)} = _#{config.name}.registerDataStream< #{stream_data_type}>(
 		    base::Time::fromSeconds(#{stream.name}Period), boost::bind( &#{task.class_name()}Base::#{callback_name(stream)}, this, _1, _2));
     }")
 
 		#unregister in cleanup
-		task.in_base_hook("cleanup", "     #{config.name}.unregisterDataStream(#{idx_name(stream)});")
+		task.in_base_hook("cleanup", "     _#{config.name}.unregisterDataStream(#{idx_name(stream)});")
 	    end
 
 	    task.in_base_hook("update", "
     base::samples::RigidBodyState dynamicTransform;
     while(_dynamic_transformations.read(dynamicTransform, false) == RTT::NewData) {
-	#{config.name}.pushDynamicTransformation(dynamicTransform);
+	_#{config.name}.pushDynamicTransformation(dynamicTransform);
     }
 
-    while(#{config.name}.step()) 
+    while(_#{config.name}.step()) 
     {
 	;
     }")
@@ -81,13 +81,13 @@ module TransformerPlugin
 	if(curTime - _lastStatusTime > base::Time::fromSeconds(1))
 	{
 	    _lastStatusTime = curTime;
-	    _#{config.name}_status.write(#{config.name}.getStatus());
+	    _#{config.name}_status.write(_#{config.name}.getStatus());
 	}
     }")
 
 	    #unregister in cleanup
 	    task.in_base_hook("stop", "
-    #{config.name}.clear();")
+    _#{config.name}.clear();")
 	end
 
         def member_name(t)
