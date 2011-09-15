@@ -430,11 +430,6 @@ module TransformerPlugin
                     doc "list of static transformations"
                 task.input_port('dynamic_transformations', '/base/samples/RigidBodyState').
                     needs_reliable_connection
-                    
-                task.hidden_operation("setFrameMapping", "    #{self.name}.setFrameMapping(sourceFrame, mappedFrame);").
-                    argument('sourceFrame', '/std/string').
-                    argument('mappedFrame', '/std/string').
-                    doc("Maps the local frame name 'sourceFrame' to a global 'mappedFrame'. This method may be called multiple times.")
             end
                 
             #add period property for every data stream
