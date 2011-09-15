@@ -341,13 +341,8 @@ module TransformerPlugin
         end
 
 	def transformation(from, to)
-            if !available_frames.include?(from)
-                raise ArgumentError, "#{from} is not a declared frame"
-            end
-            if !available_frames.include?(to)
-                raise ArgumentError, "#{to} is not a declared frame"
-            end
-	    needed_transformations.push(TransformationDescription.new(from, to))
+            frames(from, to)
+	    needed_transformations.push(TransformationDescription.new(from.to_s, to.to_s))
 	end
 
         def transform_input(port_name, transform)
@@ -373,12 +368,10 @@ module TransformerPlugin
                 raise ArgumentError, "more than one transformation provided as production of port #{port_name}"
             end
             from, to = *transform.to_a.first
+            frames(from, to)
+            from, to = from.to_str, to.to_str
 
-            if !available_frames.include?(from)
-                raise ArgumentError, "#{from} is not a declared frame"
-            elsif !available_frames.include?(to)
-                raise ArgumentError, "#{to} is not a declared frame"
-            elsif !task.has_port?(port_name)
+            if !task.has_port?(port_name)
                 raise ArgumentError, "task #{task.name} has no port called #{port_name}"
             end
 
