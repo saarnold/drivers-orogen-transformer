@@ -1,8 +1,6 @@
 require 'transformer'
 
 module Transformer
-    logger.level = Logger::DEBUG
-
     class FrameMismatch < RuntimeError; end
 
     # Module used to extend the device specification objects with the ability
