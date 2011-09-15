@@ -529,6 +529,9 @@ module Transformer
                 end
             end
 
+            if !new_selection.empty?
+                debug { "adding frame selection from #{task}: #{new_selection}" }
+            end
             task.select_frames(current_selection.merge(new_selection))
         end
     end
