@@ -551,6 +551,11 @@ module Transformer
         end
     end
 
+    Orocos::RobyPlugin::Engine.register_model_postprocessing do |system_model|
+        # For every composition, ignore all dynamic_transformations ports
+        system_model.ignore_port_for_autoconnection Orocos::Spec::InputPort, 'dynamic_transformations', '/base/samples/RigidBodyState'
+    end
+
     Orocos::RobyPlugin::Engine.register_instanciation_postprocessing do |engine, plan|
         # Transfer the frame mapping information from the instance specification
         # objects to the selected_frames hashes on the tasks
