@@ -115,7 +115,10 @@ module Transformer
                 select_frame(name, selected_frame)
             end
         end
+    end
 
+    # Module that extends the TaskContext class itself
+    module TaskContextExtension
         # Adds a test to the can_merge? predicate to avoid merging two tasks
         # that have different frame mappings
         def can_merge?(merged_task)
@@ -146,10 +149,7 @@ module Transformer
             end
             super if defined? super
         end
-    end
 
-    # Module that extends the TaskContext class itself
-    module TaskContextExtension
         module ClassExtension
             # Allows access to the transformer declaration from the Roby task model
             #
