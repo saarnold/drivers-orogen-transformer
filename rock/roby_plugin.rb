@@ -58,9 +58,13 @@ module Transformer
         def merge(other_spec)
             super if defined? super
 
-            frame_mappings.merge!(other_spec.frame_mappings) do |frame_name, sel0, sel1|
-                if sel0 != sel1
-                    raise ArgumentError, "cannot merge #{self} and #{other_spec}: frame mapping for #{frame_name} differ (resp. #{sel0} and #{sel1})"
+            result = frame_mappings.merge!(other_spec.frame_mappings) do |frame_name, sel0, sel1|
+                if !sel0 then sel1
+                elsif !sel1 then sel0
+                elsif sel0 != sel1
+                    raise ArgumentError, "cannot merge #{self} and #{other_spec}: frame mapping for #{frame_name} differ (resp. #{sel0.inspect} and #{sel1.inspect})"
+                else
+                    sel0
                 end
             end
         end
