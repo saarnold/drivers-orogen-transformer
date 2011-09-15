@@ -1,4 +1,5 @@
 require 'aggregator_plugin'
+require 'transformer'
 
 module TransformerPlugin
     class Generator
