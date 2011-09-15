@@ -1,6 +1,7 @@
 require 'transformer'
 
 module Transformer
+    # Exception raised when two different frames are being selected on the same task-local frame
     class FrameMismatch < RuntimeError; end
 
     # Module used to extend the device specification objects with the ability
