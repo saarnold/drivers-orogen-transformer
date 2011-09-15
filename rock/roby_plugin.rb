@@ -58,7 +58,7 @@ module Transformer
         def merge(other_spec)
             super if defined? super
 
-            result = frame_mappings.merge!(other_spec.frame_mappings) do |frame_name, sel0, sel1|
+            frame_mappings.merge!(other_spec.frame_mappings) do |frame_name, sel0, sel1|
                 if !sel0 then sel1
                 elsif !sel1 then sel0
                 elsif sel0 != sel1
