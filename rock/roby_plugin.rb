@@ -345,10 +345,10 @@ module Transformer
         # mapping with the mappings stored in the merged task
         def merge(merged_task)
             selected_frames.merge!(merged_task.selected_frames) do |k, v1, v2|
-                if v1 != v2
+                if v1 && v2 && v1 != v2
                     raise FrameMismatch, "cannot merge #{merged_task} into #{self} as different frames are selected for #{k}: resp. #{v1} and #{v2}"
                 end
-                v1
+                v1 || v2
             end
             super if defined? super
         end
