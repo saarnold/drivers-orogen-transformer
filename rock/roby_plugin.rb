@@ -3,6 +3,53 @@ require 'transformer'
 module Transformer
     # Exception raised when two different frames are being selected on the same task-local frame
     class FrameMismatch < RuntimeError; end
+    # Exception raised during network generation if a required transformation
+    # chain cannot be fullfilled
+    class InvalidChain < RuntimeError; end
+    # Exception raised during network generation if a declared producer cannot
+    # provide the required transformation
+    class TransformationPortNotFound < RuntimeError
+        attr_reader :task
+        attr_reader :from
+        attr_reader :to
+
+        def initialize(task, from, to)
+            @task, @from, @to = task, from, to
+        end
+
+        def pretty_print(pp)
+            pp.text "cannot find a port providing the transformation #{from} => #{to} on"
+            pp.breakable
+            task.pretty_print(pp)
+        end
+    end
+    # Exception raised during network generation if multiple ports can provide
+    # a required transformation
+    class TransformationPortAmbiguity < RuntimeError
+        attr_reader :task
+        attr_reader :from
+        attr_reader :to
+        attr_reader :candidates
+
+        def initialize(task, from, to, candidates)
+            @task, @from, @to, @candidates = task, from, to, candidates
+        end
+
+        def pretty_print(pp)
+            pp.text "multiple candidate ports to provide the transformation #{from} => #{to} on"
+            pp.nest(2) do
+                pp.breakable
+                task.pretty_print(pp)
+            end
+            pp.text "Candidates:"
+            pp.nest(2) do
+                pp.breakable
+                pp.seplist(candidates) do |c|
+                    c.pretty_print(pp)
+                end
+            end
+        end
+    end
 
     # Module used to extend the device specification objects with the ability
     # to specify frames
@@ -117,8 +164,162 @@ module Transformer
         end
     end
 
+    module CompositionExtension
+        # Returns an output port object that is providing the requested
+        # transformation, or nil if none can be found
+        #
+        # Raises TransformationPortAmbiguity if multiple ports match.
+        def find_port_for_transform(from, to)
+            associated_candidates = []
+            type_candidates = []
+            model.each_output_port do |port|
+                next if !Transformer.transform_port?(port)
+
+                if transform = find_transform_of_port(port.name)
+                    if transform.from == from && transform.to == to
+                        return port
+                    elsif ((transform.from == from || !transform.from) && (transform.to == to || !transform.to))
+                        associated_candidates << port
+                    end
+                else
+                    type_candidates << port
+                end
+            end
+
+            if associated_candidates.size == 1
+                return associated_candidates.first
+            elsif associated_candidates.size > 1
+                raise TransformationPortAmbiguity.new(self, from, to, associated_candidates)
+            end
+
+            if type_candidates.size == 1
+                return type_candidates.first
+            elsif type_candidates.size > 1
+                raise TransformationPortAmbiguity.new(self, from, to, candidates)
+            end
+
+            return nil
+        end
+
+        def select_port_for_transform(port, from, to)
+            port = if port.respond_to?(:to_str) then port
+                   else port.name
+                   end
+
+            self.each_concrete_input_connection(port) do |source_task, source_port, sink_port, policy|
+                source_task.select_port_for_transform(source_port, from, to)
+                return
+            end
+        end
+
+        def find_transform_of_port(port)
+            port = if port.respond_to?(:to_str) then port
+                   else port.name
+                   end
+
+            self.each_concrete_input_connection(port) do |source_task, source_port, sink_port, policy|
+                return source_task.find_transform_of_port(source_port)
+            end
+        end
+    end
+
     # Module that extends the TaskContext class itself
     module TaskContextExtension
+        # The set of static transformations that should be provided to the
+        # component at configuration time
+        attribute(:static_transforms) { Array.new }
+
+        # Returns the transformation that this port provides, using the actual
+        # frames (i.e. not the task-level frames, but the frames actually
+        # selected).
+        #
+        # One or both frames might be nil. The return value is nil if no
+        # transform is associated at all with this port
+        def find_transform_of_port(port)
+            return if !(tr = model.transformer)
+            if associated_transform = tr.find_transform_of_port(port)
+                from = selected_frames[associated_transform.from]
+                to   = selected_frames[associated_transform.to]
+                Transform.new(from, to)
+            end
+        end
+
+        # Yields the task output ports that produce a transformation, along with
+        # the selected frames for this port
+        #
+        # The selected frames might be nil if no transformation has been
+        # selected
+        def each_transform_output
+            if !(tr = model.transformer)
+                return
+            end
+
+            model.each_output_port do |port|
+                if associated_transform = tr.find_transform_of_port(port)
+                    from = selected_frames[associated_transform.from]
+                    to   = selected_frames[associated_transform.to]
+                    yield(port, from, to)
+                end
+            end
+        end
+
+        # Returns an output port object that is providing the requested
+        # transformation, or nil if none can be found
+        #
+        # Raises TransformationPortAmbiguity if multiple ports match.
+        def find_port_for_transform(from, to)
+            return if !(tr = model.transformer)
+
+            not_candidates = []
+            candidates = []
+            each_transform_output do |port, port_from, port_to|
+                puts "#{port} #{port_from} #{port_to}"
+                if port_from == from && port_to == to
+                    return port
+                elsif ((!port_from || port_from == from) && (!port_to || port_to == to))
+                    candidates << port
+                else
+                    not_candidates << port
+                end
+            end
+
+            if candidates.size == 1
+                return candidates.first
+            elsif candidates.size > 1
+                raise TransformationPortAmbiguity.new(self, from, to, candidates)
+            end
+
+            model.each_output_port do |port|
+                next if not_candidates.include?(port)
+                if Transformer.transform_port?(port)
+                    candidates << port
+                end
+            end
+
+            if candidates.size == 1
+                return candidates.first
+            elsif candidates.size > 1
+                raise TransformationPortAmbiguity.new(self, from, to, candidates)
+            end
+
+            return nil
+        end
+
+        # Given a port associated with a transformer transformation, assign the
+        # given frames to this local transformation
+        def select_port_for_transform(port, from, to)
+            if !(tr = model.transformer)
+                tr = model.transformer do
+                    transform_output port.name, from => to
+                end
+            end
+
+            if !(transform = tr.find_transform_of_port(port))
+                transform = tr.transform_output(port.name, from => to)
+            end
+            select_frames(transform.from => from, transform.to => to)
+        end
+
         # Adds a test to the can_merge? predicate to avoid merging two tasks
         # that have different frame mappings
         def can_merge?(merged_task)
@@ -128,8 +329,10 @@ module Transformer
 
             if tr = self.model.transformer
                 tr.available_frames.each do |frame_name|
-                    if sel = selected_frames[frame_name]
-                        if merged_task.selected_frames[frame_name] != sel
+                    this_sel = merged_task.selected_frames[frame_name]
+                    if this_sel && (sel = selected_frames[frame_name])
+                        if this_sel != sel
+                            Orocos::RobyPlugin::NetworkMergeSolver.debug { "cannot merge #{merged_task} into #{self}: frame selection for #{frame_name} differs (resp. #{merged_task.selected_frames[frame_name]} and #{sel})" }
                             return false
                         end
                     end
@@ -536,16 +739,68 @@ module Transformer
         end
     end
 
+    # Adds the transformation producers needed to properly setup the system.
+    #
+    # +engine.transformer_config+ must contain the transformation configuration
+    # object.
+    def self.add_needed_producers(engine, plan)
+        config = engine.transformer_config
+
+        plan.find_local_tasks(Orocos::RobyPlugin::TaskContext).each do |task|
+            next if !(tr = task.model.transformer)
+
+            tr.each_needed_transformation do |trsf|
+                from = task.selected_frames[trsf.from]
+                to   = task.selected_frames[trsf.to]
+                Transformer.debug { "looking for chain for #{from} => #{to} in #{task}" }
+                chain =
+                    begin
+                        config.transformation_chain(trsf.from, trsf.to)
+                    rescue Exception => e
+                        raise InvalidChain, "cannot find a transformation chain to produce #{from} => #{to} for #{task} (task frames: #{trsf.from} => #{trsf.to}): #{e.message}", e.backtrace
+                    end
+
+                Transformer.log_pp(:debug, chain)
+                static, dynamic = chain.partition
+
+                task.static_transforms = static
+                dynamic.each do |dyn|
+                    producer_task = engine.add_instance(dyn.producer)
+                    out_port = producer_task.find_port_for_transform(dyn.from, dyn.to)
+                    if !out_port
+                        raise TransformationPortNotFound.new(producer_task, dyn.from, dyn.to)
+                    end
+                    producer_task.select_port_for_transform(out_port, dyn.from, dyn.to)
+                    producer_task.connect_ports(task, [out_port.name, "dynamic_transformations"] => Hash.new)
+                end
+            end
+        end
+    end
+
     # Exception raised when a needed frame is not assigned
     class MissingFrame < RuntimeError; end
 
     # Module used to add some functionality to Orocos::RobyPlugin::Engine
     module EngineExtension
+        # Holds the Transformer::TransformationManager object that stores the
+        # current transformer configuration (static/dynamic transformation
+        # configuration)
+        attribute(:transformer_config) do
+            Transformer::TransformationManager.new do |producer|
+                if !self.valid_definition?(producer)
+                    raise ArgumentError, "#{producer} is not a known device, definition or instance requirements object"
+                end
+            end
+        end
+
+        # During network validation, checks that all required frames have been
+        # configured
         def validate_generated_network(plan, options)
             super if defined? super
 
             plan.find_local_tasks(Orocos::RobyPlugin::TaskContext).each do |task|
                 next if !(tr = task.model.transformer)
+
                 tr.each_needed_transformation do |transform|
                     if !task.selected_frames[transform.from]
                         raise MissingFrame, "could not find a frame assignment for #{transform.from} in #{task}"
@@ -555,6 +810,15 @@ module Transformer
                     end
                 end
             end
+        end
+
+        # Loads the transformer configuration file from +path+ into the engine's
+        # configuration.
+        #
+        # The configuration is overlaid over the current configuration. Use
+        # #clean_transformer_conf to start it from scratch
+        def load_transformer_conf(*path)
+            transformer_config.load_configuration(*path)
         end
     end
 
@@ -577,11 +841,17 @@ module Transformer
 
     Orocos::RobyPlugin::Engine.register_instanciated_network_postprocessing do |engine, plan, validate|
         FramePropagation.compute_frames(plan)
+
+        # Now find out the frame producers that each task needs, and add them to
+        # the graph
+        add_needed_producers(engine, plan)
     end
 end
 
 Orocos::RobyPlugin::Component.include Transformer::ComponentExtension
 Orocos::RobyPlugin::TaskContext.include Transformer::TaskContextExtension
+Orocos::RobyPlugin::Composition.include Transformer::CompositionExtension
+
 Orocos::RobyPlugin::DeviceInstance.include Transformer::DeviceExtension
 Orocos::RobyPlugin::Graphviz.include Transformer::GraphvizExtension
 Orocos::RobyPlugin::InstanceRequirements.include Transformer::InstanceRequirementsExtension
