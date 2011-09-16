@@ -468,9 +468,13 @@ module Transformer
             end
         end
 
+        # Assignment of a transformation during frame propagation
         class TransformAnnotation
+            # The task on which we act
             attr_reader :task
+            # The selected source frame
             attr_reader :from
+            # The selected target frame
             attr_reader :to
 
             def initialize(task, from, to)
@@ -479,7 +483,14 @@ module Transformer
                 @to   = to
             end
 
+            # Needed by DataFlowComputation
+            #
+            # Returns true if neither +from+ nor +to+ are set
             def empty?; !@from && !@to end
+            # Merge the information of two TransformAnnotation objects.
+            #
+            # This succeeds only if the two annotations point to the same
+            # frames, or if one has nil and the other does not
             def merge(ann)
                 if !ann.kind_of?(TransformAnnotation)
                     raise ArgumentError, "cannot merge a frame annotation with a transform annotation. You are probably connecting two ports, one declared as a transform input or output and one only associated with a frame"
@@ -495,7 +506,11 @@ module Transformer
                 end
             end
 
-            def to_s
+            def pretty_print(pp)
+                pp.text "#{from} => #{to}"
+            end
+
+            def to_s # :nodoc:
                 "#<TransformAnnotation: #{task} #{from} => #{to}>"
             end
         end
