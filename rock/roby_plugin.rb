@@ -353,6 +353,18 @@ module Transformer
             super if defined? super
         end
 
+        def select_frames(selection)
+            if tr = self.model.transformer
+                selection.each do |local_frame, global_frame|
+                    # If the frame is not configurable, raise
+                    if tr.static?(local_frame) && local_frame != global_frame
+                        raise ArgumentError, "cannot select a frame name different than #{local_frame} for #{self}, as the component does not support configuring that frame"
+                    end
+                end
+            end
+            super
+        end
+
         module ClassExtension
             # Allows access to the transformer declaration from the Roby task model
             #
@@ -704,6 +716,13 @@ module Transformer
         end
 
         def self.initialize_selected_frames(task, current_selection)
+            # Do selection for the frames that can't be configured anyways
+            if tr = task.model.transformer
+                tr.each_statically_mapped_frame do |frame_name|
+                    task.select_frames(frame_name => frame_name)
+                end
+            end
+
             if task.requirements
                 new_selection = task.requirements.frame_mappings
             else
