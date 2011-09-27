@@ -313,6 +313,15 @@ module TransformerPlugin
         # #associate_frame_to_ports and #configurable_frames
         def frames(*frame_names)
             frame_names.each do |name|
+
+                if name.respond_to?(:to_sym)
+                    name = name.to_s
+                elsif name.respond_to?(:to_str)
+                    name = name.to_str
+                else
+                    raise ArgumentError, "frame names should be strings, got #{name.inspect}"
+                end
+
                 name = name.to_s
                 if name !~ /^\w+$/
                     raise ArgumentError, "frame names can only contain alphanumeric characters and _, got #{name}"
