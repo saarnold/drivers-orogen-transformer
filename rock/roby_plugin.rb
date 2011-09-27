@@ -806,6 +806,8 @@ module Transformer
                     end
                     producer_task.select_port_for_transform(out_port, dyn.from, dyn.to)
                     producer_task.connect_ports(task, [out_port.name, "dynamic_transformations"] => Hash.new)
+                    task.depends_on(producer_task)
+                    task.should_start_after producer_task
                 end
             end
         end
