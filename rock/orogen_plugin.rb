@@ -572,6 +572,9 @@ module TransformerPlugin
 
             task.project.import_types_from "base"
 
+            Orocos::Generation.info("transformer: adding needs_configuration")
+            task.needs_configuration
+
             # Don't add the general stuff if it has already been added
             if !task.has_property?("transformer_max_latency")
                 task.project.import_types_from "base"
