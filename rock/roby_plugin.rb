@@ -1,8 +1,77 @@
 require 'transformer'
 
 module Transformer
-    # Exception raised when two different frames are being selected on the same task-local frame
-    class FrameMismatch < RuntimeError; end
+    # Exception raised when a frame is being selected with #selected_frame, but
+    # the selection is invalid
+    #
+    # The reason for the invalidity is (for now) stored only in the message
+    class InvalidFrameSelection < RuntimeError
+        # The task for which the selection was done
+        attr_reader :task
+        # The task's frame name
+        attr_reader :frame
+        # List of [task, port] pairs that give information about why we are
+        # updating the frame
+        attr_reader :related_ports
+
+        def initialize(task, frame)
+            @task, @frame = task, frame
+            @related_ports = Array.new
+        end
+
+        def pretty_print_related_ports(pp)
+            pp.seplist(related_ports) do |src|
+                task, port_name, info = *src
+                pp.text "#{src[0]}.#{src[1]}: #{info}"
+            end
+        end
+    end
+    # Exception raised when two different frames are being selected for the same
+    # task/frame_name pair
+    class FrameSelectionConflict < InvalidFrameSelection
+        # The currently selected frame
+        attr_reader :current_frame
+        # The newly selected frame
+        attr_reader :new_frame
+
+        def initialize(task, frame, current, new)
+            super(task, frame)
+            @current_frame = frame
+            @new_frame = new
+        end
+
+        def pretty_print(pp)
+            pp.text "conflicting frames selected for #{task}.#{frame}: #{current_frame} != #{new_frame}"
+            if !related_ports.empty?
+                pp.breakable
+                pp.text "related ports:"
+                pp.nest(2) do
+                    pp.breakable
+                    pretty_print_related_ports(pp)
+                end
+            end
+        end
+    end
+    # Exception raised when #select_frame is called on a static frame with a
+    # different name than the frame's static name
+    class StaticFrameChangeError < InvalidFrameSelection
+        # The name of the frame that was being assigned to a static frame
+        attr_reader :new_frame
+        def initialize(task, frame, current, new)
+            super(task, frame)
+            @new_frame = new
+        end
+        def pretty_print(pp)
+            pp.text "cannot change frame #{task}.#{frame} to #{new_frame}, as the component does not support it"
+            if !related_ports.empty?
+                pp.text "related ports:"
+                pp.nest(2) do
+                    pp.breakable
+                    pretty_print_related_ports(pp)
+                end
+            end
+        end
+    end
     # Exception raised during network generation if a required transformation
     # chain cannot be fullfilled
     class InvalidChain < RuntimeError; end
@@ -147,7 +216,7 @@ module Transformer
         def select_frame(frame_name, selected_frame)
             if current = selected_frames[frame_name]
                 if current != selected_frame
-                    raise FrameMismatch, "cannot select both #{current} and #{selected_frame} for the frame #{frame_name} of #{self}"
+                    raise FrameSelectionConflict.new(self, frame_name, current, selected_frame), "cannot select both #{current} and #{selected_frame} for the frame #{frame_name} of #{self}"
                 end
             else
                 selected_frames[frame_name] = selected_frame
@@ -358,7 +427,7 @@ module Transformer
                 selection.each do |local_frame, global_frame|
                     # If the frame is not configurable, raise
                     if tr.static?(local_frame) && local_frame != global_frame
-                        raise ArgumentError, "cannot select a frame name different than #{local_frame} for #{self}, as the component does not support configuring that frame"
+                        raise StaticFrameChangeError.new(self, local_frame), "cannot select a frame name different than #{local_frame} for #{self}, as the component does not support configuring that frame"
                     end
                 end
             end
@@ -664,6 +733,74 @@ module Transformer
             end
         end
 
+        class PortAssociationMismatch < RuntimeError
+            # The problematic endpoint, as a [task, port_name] pair
+            attr_reader :endpoint
+            # The other side of the problematic connection(s) 
+            attr_reader :connections
+            # The association type expected by +endpoint+. Can either be 'frame'
+            # for an association between a port and a frame, and 'transform' for
+            # an association between a port and a transformation.
+            attr_reader :association_type
+
+            def initialize(task, port_name, type)
+                @endpoint = [task, port_name]
+                @association_type = type
+
+                @connections = []
+                task.each_concrete_input_connection(port_name) do |source_task, source_port_name, _|
+                    @connections << [source_task, source_port_name]
+                end
+                task.each_concrete_output_connection(port_name) do |_, sink_port_name, sink_task, _|
+                    @connections << [sink_task, sink_port_name]
+                end
+            end
+
+            def pretty_print(pp)
+                pp.text "#{endpoint[0]}.#{endpoint[1]} was expecting an association with a #{association_type}, but one or more connections mismatch"
+                pp.nest(2) do
+                    pp.breakable
+                    pp.seplist(connections) do |conn|
+                        pp.text "#{conn[0]}.#{conn[1]}"
+                    end
+                end
+            end
+        end
+
+        # Computes the set of ports and selected frames that can give an insight
+        # as to the error represented by +e+
+        def refine_invalid_frame_selection(e)
+            related_ports = []
+            tr = e.task.model.transformer
+            tr.each_annotated_port do |port, frame_name|
+                next if !has_information_for_port?(e.task, port.name)
+                if frame_name == e.frame
+                    related_ports << [port.name, :selected_frame]
+                end
+            end
+            tr.each_transform_port do |port, transform|
+                next if !has_information_for_port?(e.task, port.name)
+                if transform.from == e.frame
+                    related_ports << [port.name, :from]
+                end
+                if transform.to == e.frame
+                    related_ports << [port.name, :to]
+                end
+            end
+
+            related_ports.each do |port_name, accessor|
+                info = port_info(e.task, port_name)
+                selected_frame = info.send(accessor)
+
+                e.task.each_concrete_input_connection(port_name) do |source_task, source_port, _|
+                    e.related_ports << [source_task, source_port, selected_frame]
+                end
+                e.task.each_concrete_output_connection(port_name) do |source_port, sink_port, sink_task, _|
+                    e.related_ports << [sink_task, sink_port, selected_frame]
+                end
+            end
+        end
+
         def propagate_task(task)
             return if !(tr = task.model.transformer)
 
@@ -671,18 +808,33 @@ module Transformer
             # the task.
             tr.each_annotated_port do |port, frame|
                 if has_information_for_port?(task, port.name)
-                    task.select_frame(frame, port_info(task, port.name).selected_frame)
+                    info = port_info(task, port.name)
+                    if !info.respond_to?(:selected_frame)
+                        raise PortAssociationMismatch.new(task, port.name, 'frame')
+                    end
+
+                    begin
+                        task.select_frame(frame, info.selected_frame)
+                    rescue InvalidFrameSelection => e
+                        refine_invalid_frame_selection(e)
+                        raise e, e.message, e.backtrace
+                    end
                 end
             end
             tr.each_transform_port do |port, transform|
                 next if !has_information_for_port?(task, port.name)
                 info = port_info(task, port.name)
 
-                if info.from
-                    task.select_frame(transform.from, info.from)
-                end
-                if info.to
-                    task.select_frame(transform.to, info.to)
+                begin
+                    if info.from
+                        task.select_frame(transform.from, info.from)
+                    end
+                    if info.to
+                        task.select_frame(transform.to, info.to)
+                    end
+                rescue InvalidFrameSelection => e
+                    refine_invalid_frame_selection(e)
+                    raise e, e.message, e.backtrace
                 end
             end
 
