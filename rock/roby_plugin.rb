@@ -890,7 +890,7 @@ module Transformer
 
         def self.initialize_selected_frames(task, current_selection)
             # Do selection for the frames that can't be configured anyways
-            if tr = task.model.transformer
+            if task.model.respond_to?(:transformer) && (tr = task.model.transformer)
                 tr.each_statically_mapped_frame do |frame_name|
                     task.select_frames(frame_name => frame_name)
                 end
