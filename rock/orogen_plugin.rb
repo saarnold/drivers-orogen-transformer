@@ -461,11 +461,11 @@ module TransformerPlugin
         # This declaration announces that the data flowing through the specified
         # ports is represented in the given frame
         def associate_frame_to_ports(frame_name, *port_names)
+            frames(frame_name)
             port_names.each do |pname|
                 if !task.has_port?(pname)
                     raise ArgumentError, "task #{task.name} has no port called #{pname}"
                 end
-                frames(pname)
                 port = task.find_port(pname)
                 # WARN: do not verify here that +port+ is NOT of type
                 # RigidBodyState. The reason is that some components will
