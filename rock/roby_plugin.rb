@@ -231,6 +231,25 @@ module Transformer
                 select_frame(name, selected_frame)
             end
         end
+
+        # Returns true if the specified transformation is provided through a
+        # dedicated port on the task, or if it should be built by the
+        # transformer by aggregating information from dynamic_transformations
+        #
+        # The frame names are actual frame names, not task-local ones
+        def has_dedicated_input?(from, to)
+            return false if !(tr = model.transformer)
+            tr.each_transform_port do |port, transform|
+                if port.kind_of?(Orocos::Spec::InputPort)
+                    port_from = selected_frames[transform.from]
+                    port_to   = selected_frames[transform.to]
+                    if port_from == from && port_to == to
+                        return true
+                    end
+                end
+            end
+            return false
+        end
     end
 
     module CompositionExtension
@@ -938,6 +957,8 @@ module Transformer
             tr.each_needed_transformation do |trsf|
                 from = task.selected_frames[trsf.from]
                 to   = task.selected_frames[trsf.to]
+                next if task.has_dedicated_input?(from, to)
+
                 Transformer.debug { "looking for chain for #{from} => #{to} in #{task}" }
                 chain =
                     begin
@@ -951,6 +972,8 @@ module Transformer
 
                 task.static_transforms = static
                 dynamic.each do |dyn|
+                    next if task.has_dedicated_input?(dyn.from, dyn.to)
+
                     producer_task = engine.add_instance(dyn.producer)
                     out_port = producer_task.find_port_for_transform(dyn.from, dyn.to)
                     if !out_port
