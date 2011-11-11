@@ -17,7 +17,11 @@ module TransformerPlugin
 	    ")	    
 	    
 	    config.each_needed_transformation.each do |t|
-		task.add_base_member("transformer", member_name(t), "transformer::Transformation &").
+                # BIG FAT WARNING: the key used here for #add_base_member MUST
+                # be lexicographically bigger than "transformer" to make sure
+                # that the transformer object is constructed before these
+                # members
+		task.add_base_member("transformer_transformation", member_name(t), "transformer::Transformation &").
 		    initializer("#{member_name(t)}(_#{config.name}.registerTransformation(\"#{t.from}\", \"#{t.to}\"))")
 	    end
 
