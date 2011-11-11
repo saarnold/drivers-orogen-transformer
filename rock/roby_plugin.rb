@@ -903,7 +903,10 @@ module Transformer
             end
 
             # If the task is associated to a device, check the frame
-            # declarations on the device declaration
+            # declarations on the device declaration, and assign them. The
+            # assignation is done through the port (i.e. device->port and
+            # port->frame), so it requires frame-to-port or transform-to-port
+            # associations
             if task.respond_to?(:each_device) && (tr = task.model.transformer)
                 task.each_device do |srv, dev|
                     selected_frame = dev.frame
@@ -922,7 +925,7 @@ module Transformer
                         # Do not associate the ports that output transformations
                         if selected_transform && Transformer.transform_port?(out_port)
                             from, to = selected_transform.from, selected_transform.to
-                            if tr && (transform = tr.find_transform_of_port(out_port))
+                            if transform = tr.find_transform_of_port(out_port)
                                 if from
                                     new_selection[transform.from] = from
                                 end
@@ -931,7 +934,7 @@ module Transformer
                                 end
                             end
                         elsif selected_frame
-                            if tr && (frame_name = tr.find_frame_of_port(out_port))
+                            if frame_name = tr.find_frame_of_port(out_port)
                                 new_selection[frame_name] = selected_frame
                             end
                         end
