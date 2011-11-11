@@ -348,7 +348,11 @@ module TransformerPlugin
 
         # True if the global name for the local +frame_name+ can be configured
         def configurable?(frame_name)
-            task.has_property?("#{frame_name}_frame")
+            !needs_transformer? || task.has_property?("#{frame_name}_frame")
+        end
+
+        def static?(frame_name)
+            needs_transformer? && !configurable?(frame_name)
         end
 
         # Returns true if +frame_name+ is a known name for a frame on this
