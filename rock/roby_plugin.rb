@@ -361,7 +361,6 @@ module Transformer
             not_candidates = []
             candidates = []
             each_transform_output do |port, port_from, port_to|
-                puts "#{port} #{port_from} #{port_to}"
                 if port_from == from && port_to == to
                     return port
                 elsif ((!port_from || port_from == from) && (!port_to || port_to == to))
