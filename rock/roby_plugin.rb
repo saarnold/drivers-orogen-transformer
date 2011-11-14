@@ -977,14 +977,27 @@ module Transformer
             tr.each_needed_transformation do |trsf|
                 from = task.selected_frames[trsf.from]
                 to   = task.selected_frames[trsf.to]
+                if !from || !to
+                    # This is validated in #validate_generated_network. Just
+                    # ignore here.
+                    #
+                    # We do that so that the :validate_network option to
+                    # Engine#instanciate applies
+                    next
+                end
+
                 next if task.has_dedicated_input?(from, to)
 
                 Transformer.debug { "looking for chain for #{from} => #{to} in #{task}" }
                 chain =
                     begin
-                        config.transformation_chain(trsf.from, trsf.to)
+                        config.transformation_chain(from, to)
                     rescue Exception => e
-                        raise InvalidChain, "cannot find a transformation chain to produce #{from} => #{to} for #{task} (task frames: #{trsf.from} => #{trsf.to}): #{e.message}", e.backtrace
+                        if engine.options[:validate_network]
+                            raise InvalidChain, "cannot find a transformation chain to produce #{from} => #{to} for #{task} (task-local frames: #{trsf.from} => #{trsf.to}): #{e.message}", e.backtrace
+                        else
+                            next
+                        end
                     end
 
                 Transformer.log_pp(:debug, chain)
