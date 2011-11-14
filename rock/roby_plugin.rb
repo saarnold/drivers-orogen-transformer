@@ -252,6 +252,21 @@ module Transformer
         end
     end
 
+    # Extensions to the Component class
+    module ComponentModelExtension
+        # This returns an InstanciatedComponent object that can be used in
+        # other #use statements in the deployment spec
+        #
+        # For instance,
+        #
+        #   add(Cmp::CorridorServoing).
+        #       use(Project::Task.use_frame('body' => 'local_frame'))
+        #
+        def use_frames(*spec, &block)
+            Orocos::RobyPlugin::Engine.create_instanciated_component(nil, nil, self).use_frames(*spec, &block)
+        end
+    end
+
     module CompositionExtension
         # Returns an output port object that is providing the requested
         # transformation, or nil if none can be found
@@ -1065,6 +1080,7 @@ module Transformer
 end
 
 Orocos::RobyPlugin::Component.include Transformer::ComponentExtension
+Orocos::RobyPlugin::Component.extend Transformer::ComponentModelExtension
 Orocos::RobyPlugin::TaskContext.include Transformer::TaskContextExtension
 Orocos::RobyPlugin::Composition.include Transformer::CompositionExtension
 
