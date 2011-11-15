@@ -237,18 +237,24 @@ module Transformer
         # transformer by aggregating information from dynamic_transformations
         #
         # The frame names are actual frame names, not task-local ones
-        def has_dedicated_input?(from, to)
-            return false if !(tr = model.transformer)
+        def find_transformation_input(from, to)
+            return if !(tr = model.transformer)
             tr.each_transform_port do |port, transform|
                 if port.kind_of?(Orocos::Spec::InputPort)
                     port_from = selected_frames[transform.from]
                     port_to   = selected_frames[transform.to]
                     if port_from == from && port_to == to
-                        return true
+                        return port
                     end
                 end
             end
-            return false
+            nil
+        end
+
+        # Returns true if one of the task's input port is configured to provide
+        # the requested transformation
+        def has_transformation_input?(from, to)
+            !!find_transformation_input(from, to)
         end
     end
 
@@ -986,7 +992,48 @@ module Transformer
                     next
                 end
 
-                next if task.has_dedicated_input?(from, to)
+                # Look for dedicated input for either the +from+ or the +to+. We
+                # currently don't handle them properly, i.e. we don't make them
+                # mandatory links in the transformation chains (that would be
+                # difficult anyway). Instead, we only use them if they are (1)
+                # connected and their from and/or to are part of a required
+                # transformation or (2) connected and a link computed by the
+                # transformation resolver.
+                #
+                # This takes care of (1)
+                changed = true
+                while changed
+                    changed = false
+                    tr.each_transform_port do |port, transform|
+                        if port.kind_of?(Orocos::Spec::InputPort) && task.connected?(port.name)
+                            port_from = selected_frames[transform.from]
+                            port_to   = selected_frames[transform.to]
+
+                            changed = false
+                            if port_from == from
+                                from = port_to
+                                changed = true
+                            end
+                            if port_to == from
+                                to = port_from
+                                changed = true
+                            end
+                            if port_from == to
+                                from = port_to
+                                changed = true
+                            end
+                            if port_to == to
+                                to = port_from
+                                changed = true
+                            end
+                            break if changed
+                        end
+                    end
+                end
+
+                if from == to
+                    next
+                end
 
                 Transformer.debug { "looking for chain for #{from} => #{to} in #{task}" }
                 chain =
@@ -1005,7 +1052,14 @@ module Transformer
 
                 task.static_transforms = static
                 dynamic.each do |dyn|
-                    next if task.has_dedicated_input?(dyn.from, dyn.to)
+                    # This takes care of (2) above (don't connect transformation
+                    # producers if there is a dedicated port for the
+                    # transformaton)
+                    if dedicated_port = task.find_transformation_input(dyn.from, dyn.to)
+                        if task.connected?(dedicated_port)
+                            next
+                        end
+                    end
 
                     producer_task = engine.add_instance(dyn.producer)
                     out_port = producer_task.find_port_for_transform(dyn.from, dyn.to)
