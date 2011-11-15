@@ -452,6 +452,11 @@ module Transformer
         # Adds a pass in the merge operation that updates the selected frames
         # mapping with the mappings stored in the merged task
         def merge(merged_task)
+            new = merged_task.static_transforms.find_all do |trsf|
+                !static_transforms.any? { |t| t.from == trsf.from && t.to == trsf.to }
+            end
+            static_transforms.concat(new)
+
             selected_frames.merge!(merged_task.selected_frames) do |k, v1, v2|
                 if v1 && v2 && v1 != v2
                     raise FrameMismatch, "cannot merge #{merged_task} into #{self} as different frames are selected for #{k}: resp. #{v1} and #{v2}"
@@ -461,6 +466,14 @@ module Transformer
             super if defined? super
         end
 
+        # Select the given global frame names for task-local frames.
+        #
+        # Example:
+        #
+        #    select_frames 'local' => 'global'
+        #
+        # Raises StaticFrameChangeError if 'local' is a static frame (i.e. no
+        # property exists to change it) and 'global' is not its hardcoded value.
         def select_frames(selection)
             if tr = self.model.transformer
                 selection.each do |local_frame, global_frame|
@@ -471,6 +484,31 @@ module Transformer
                 end
             end
             super
+        end
+
+        # Applies the selected frames to the task properties
+        def configure
+            super if defined? super
+            if tr = self.model.transformer
+                selected_frames.each do |local_frame, global_frame|
+                    if orogen_task.has_property?("#{local_frame}_frame")
+                        property("#{local_frame}_frame").write(global_frame)
+                    end
+                end
+
+                if !static_transforms.empty?
+                    orogen_task.static_transformations = static_transforms.map do |trsf|
+                        rbs = Types::Base::Samples::RigidBodyState.new
+                        rbs.zero!
+                        rbs.time = Time.now
+                        rbs.sourceFrame = trsf.from
+                        rbs.targetFrame = trsf.to
+                        rbs.position = trsf.translation
+                        rbs.orientation = trsf.rotation
+                        rbs
+                    end
+                end
+            end
         end
 
         module ClassExtension
@@ -979,6 +1017,7 @@ module Transformer
 
         plan.find_local_tasks(Orocos::RobyPlugin::TaskContext).each do |task|
             next if !(tr = task.model.transformer)
+            Transformer.debug { "computing needed static and dynamic transformations for #{task}" }
 
             tr.each_needed_transformation do |trsf|
                 from = task.selected_frames[trsf.from]
@@ -1046,10 +1085,14 @@ module Transformer
                             next
                         end
                     end
-
                 Transformer.log_pp(:debug, chain)
-                static, dynamic = chain.partition
 
+                static, dynamic = chain.partition
+                Transformer.debug do
+                    Transformer.debug "#{static.size} static transformations"
+                    Transformer.debug "#{dynamic.size} dynamic transformations"
+                    break
+                end
                 task.static_transforms = static
                 dynamic.each do |dyn|
                     # This takes care of (2) above (don't connect transformation
