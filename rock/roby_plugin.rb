@@ -1125,6 +1125,14 @@ module Transformer
         def load_transformer_conf(*path)
             transformer_config.load_configuration(*path)
         end
+
+        # Passes calls to the transformer config
+        def method_missing(m, *args, &block)
+            if m == :static_transform || m == :dynamic_transform || m == :frames
+                return transformer_config.conf.send(m, *args, &block)
+            end
+            super
+        end
     end
 
     Orocos::RobyPlugin::Engine.register_model_postprocessing do |system_model|
