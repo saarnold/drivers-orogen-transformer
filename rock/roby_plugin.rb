@@ -1031,53 +1031,22 @@ module Transformer
                     next
                 end
 
-                # Look for dedicated input for either the +from+ or the +to+. We
-                # currently don't handle them properly, i.e. we don't make them
-                # mandatory links in the transformation chains (that would be
-                # difficult anyway). Instead, we only use them if they are (1)
-                # connected and their from and/or to are part of a required
-                # transformation or (2) connected and a link computed by the
-                # transformation resolver.
-                #
-                # This takes care of (1)
-                changed = true
-                while changed
-                    changed = false
-                    tr.each_transform_port do |port, transform|
-                        if port.kind_of?(Orocos::Spec::InputPort) && task.connected?(port.name)
-                            port_from = selected_frames[transform.from]
-                            port_to   = selected_frames[transform.to]
-
-                            changed = false
-                            if port_from == from
-                                from = port_to
-                                changed = true
-                            end
-                            if port_to == from
-                                to = port_from
-                                changed = true
-                            end
-                            if port_from == to
-                                from = port_to
-                                changed = true
-                            end
-                            if port_to == to
-                                to = port_from
-                                changed = true
-                            end
-                            break if changed
-                        end
+                self_producers = Hash.new
+                tr.each_transform_port do |port, transform|
+                    if port.kind_of?(Orocos::Spec::InputPort) && task.connected?(port.name)
+                        port_from = task.selected_frames[transform.from]
+                        port_to   = task.selected_frames[transform.to]
+                        self_producers[[port_from, port_to]] = port
                     end
                 end
 
-                if from == to
-                    next
+                Transformer.debug do
+                    Transformer.debug "looking for chain for #{from} => #{to} in #{task}"
+                    Transformer.debug "  with local producers: #{self_producers}"
                 end
-
-                Transformer.debug { "looking for chain for #{from} => #{to} in #{task}" }
                 chain =
                     begin
-                        config.transformation_chain(from, to)
+                        config.transformation_chain(from, to, self_producers)
                     rescue Exception => e
                         if engine.options[:validate_network]
                             raise InvalidChain, "cannot find a transformation chain to produce #{from} => #{to} for #{task} (task-local frames: #{trsf.from} => #{trsf.to}): #{e.message}", e.backtrace
@@ -1095,13 +1064,8 @@ module Transformer
                 end
                 task.static_transforms = static
                 dynamic.each do |dyn|
-                    # This takes care of (2) above (don't connect transformation
-                    # producers if there is a dedicated port for the
-                    # transformaton)
-                    if dedicated_port = task.find_transformation_input(dyn.from, dyn.to)
-                        if task.connected?(dedicated_port)
-                            next
-                        end
+                    if dyn.producer.kind_of?(Orocos::Spec::InputPort)
+                        next
                     end
 
                     producer_task = engine.add_instance(dyn.producer)
