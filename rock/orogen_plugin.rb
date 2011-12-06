@@ -58,7 +58,7 @@ module TransformerPlugin
     {
     const double #{stream.name}Period = _#{stream.name}_period.value();
     #{idx_name(stream)} = _#{config.name}.registerDataStream< #{stream_data_type}>(
-		    base::Time::fromSeconds(#{stream.name}Period), boost::bind( &#{task.class_name()}Base::#{callback_name(stream)}, this, _1, _2));
+		    base::Time::fromSeconds(#{stream.name}Period), boost::bind( &#{task.class_name()}Base::#{callback_name(stream)}, this, _1, _2, #{s.priority}, \"#{s.name}\"));
     }")
 
 		#unregister in cleanup
@@ -190,10 +190,13 @@ module TransformerPlugin
 	    attr_reader :name
             # The stream period
 	    attr_reader :period
+            # The stream period
+	    attr_reader :priority
 
-	    def initialize(name, period)
+	    def initialize(name, period, priority)
 		@name   = name
 		@period = period
+                @priority = priority
 	    end
 	end
 	
@@ -299,15 +302,20 @@ module TransformerPlugin
             @transform_inputs  = Hash.new
 
             @configurable_frames = Set.new
+            @priority = 0
 	end
 	
         # Requires the transformer to align the given input port on the
         # transformations
-	def align_port(name, period)
+	def align_port(name, period, priority = nil)
             if !task.has_input_port?(name)
                 raise ArgumentError, "#{task.name} has no input port called #{name}, cannot align"
             end
-	    streams << StreamDescription.new(name, period)
+            if priority
+                streams << StreamDescription.new(name, period, priority)
+            else
+                streams << StreamDescription.new(name, period, (@priority += 1))
+            end
 	end
 
         # Explicitely declares some frames
