@@ -39,13 +39,21 @@ module TransformerPlugin
 ")
 
 	    config.streams.each do |stream|
+		stream_data_type = type_cxxname(task, stream)
+
 		# Pull the data in the update hook
 		port_listener_ext.add_port_listener(stream.name) do |sample_name|
-                    "	_#{config.name}.pushData(#{idx_name(stream)}, #{sample_name}.time, #{sample_name});"
+                    ### HACK TODO
+                    # This needs fixing by annotating opaques (i.e. telling
+                    # oroGen that some opaques 'behave as' pointers)
+                    time_access =
+                        if stream_data_type =~ /ReadOnlyPointer/ then "#{sample_name}->time"
+                        else "#{sample_name}.time"
+                        end
+
+                    "	_#{config.name}.pushData(#{idx_name(stream)}, #{time_access}, #{sample_name});"
 		end
 
-		stream_data_type = type_cxxname(task, stream)
-		
 		#add variable for index
 		task.add_base_member("transformer", idx_name(stream), "int")
 		
@@ -58,7 +66,7 @@ module TransformerPlugin
     {
     const double #{stream.name}Period = _#{stream.name}_period.value();
     #{idx_name(stream)} = _#{config.name}.registerDataStream< #{stream_data_type}>(
-		    base::Time::fromSeconds(#{stream.name}Period), boost::bind( &#{task.class_name()}Base::#{callback_name(stream)}, this, _1, _2, #{s.priority}, \"#{s.name}\"));
+		    base::Time::fromSeconds(#{stream.name}Period), boost::bind( &#{task.class_name}Base::#{callback_name(stream)}, this, _1, _2), #{stream.priority}, \"#{stream.name}\");
     }")
 
 		#unregister in cleanup
