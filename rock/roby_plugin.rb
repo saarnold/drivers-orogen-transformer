@@ -1087,6 +1087,8 @@ module Transformer
 
     # Module used to add some functionality to Orocos::RobyPlugin::Engine
     module EngineExtension
+        attr_predicate :transformer_enabled?, true
+
         # Holds the Transformer::TransformationManager object that stores the
         # current transformer configuration (static/dynamic transformation
         # configuration)
@@ -1103,15 +1105,17 @@ module Transformer
         def validate_generated_network(plan, options)
             super if defined? super
 
-            plan.find_local_tasks(Orocos::RobyPlugin::TaskContext).each do |task|
-                next if !(tr = task.model.transformer)
+            if transformer_enabled?
+                plan.find_local_tasks(Orocos::RobyPlugin::TaskContext).each do |task|
+                    next if !(tr = task.model.transformer)
 
-                tr.each_needed_transformation do |transform|
-                    if !task.selected_frames[transform.from]
-                        raise MissingFrame, "could not find a frame assignment for #{transform.from} in #{task}"
-                    end
-                    if !task.selected_frames[transform.to]
-                        raise MissingFrame, "could not find a frame assignment for #{transform.to} in #{task}"
+                    tr.each_needed_transformation do |transform|
+                        if !task.selected_frames[transform.from]
+                            raise MissingFrame, "could not find a frame assignment for #{transform.from} in #{task}"
+                        end
+                        if !task.selected_frames[transform.to]
+                            raise MissingFrame, "could not find a frame assignment for #{transform.to} in #{task}"
+                        end
                     end
                 end
             end
@@ -1136,28 +1140,34 @@ module Transformer
     end
 
     Orocos::RobyPlugin::Engine.register_model_postprocessing do |system_model|
-        # For every composition, ignore all dynamic_transformations ports
-        system_model.ignore_port_for_autoconnection Orocos::Spec::InputPort, 'dynamic_transformations', '/base/samples/RigidBodyState'
+        if engine.transformer_enabled?
+            # For every composition, ignore all dynamic_transformations ports
+            system_model.ignore_port_for_autoconnection Orocos::Spec::InputPort, 'dynamic_transformations', '/base/samples/RigidBodyState'
+        end
     end
 
     Orocos::RobyPlugin::Engine.register_instanciation_postprocessing do |engine, plan|
-        # Transfer the frame mapping information from the instance specification
-        # objects to the selected_frames hashes on the tasks
-        tasks = plan.find_local_tasks(Orocos::RobyPlugin::Component).roots(Roby::TaskStructure::Hierarchy)
-        tasks.each do |root_task|
-            FramePropagation.initialize_selected_frames(root_task, Hash.new)
-            Roby::TaskStructure::Hierarchy.each_bfs(root_task, BGL::Graph::ALL) do |from, to, info|
-                FramePropagation.initialize_selected_frames(to, from.selected_frames)
+        if engine.transformer_enabled?
+            # Transfer the frame mapping information from the instance specification
+            # objects to the selected_frames hashes on the tasks
+            tasks = plan.find_local_tasks(Orocos::RobyPlugin::Component).roots(Roby::TaskStructure::Hierarchy)
+            tasks.each do |root_task|
+                FramePropagation.initialize_selected_frames(root_task, Hash.new)
+                Roby::TaskStructure::Hierarchy.each_bfs(root_task, BGL::Graph::ALL) do |from, to, info|
+                    FramePropagation.initialize_selected_frames(to, from.selected_frames)
+                end
             end
         end
     end
 
     Orocos::RobyPlugin::Engine.register_instanciated_network_postprocessing do |engine, plan, validate|
-        FramePropagation.compute_frames(plan)
+        if engine.transformer_enabled?
+            FramePropagation.compute_frames(plan)
 
-        # Now find out the frame producers that each task needs, and add them to
-        # the graph
-        add_needed_producers(engine, plan)
+            # Now find out the frame producers that each task needs, and add them to
+            # the graph
+            add_needed_producers(engine, plan)
+        end
     end
 end
 
