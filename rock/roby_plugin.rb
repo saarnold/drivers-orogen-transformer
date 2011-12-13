@@ -1140,10 +1140,8 @@ module Transformer
     end
 
     Orocos::RobyPlugin::Engine.register_model_postprocessing do |system_model|
-        if engine.transformer_enabled?
-            # For every composition, ignore all dynamic_transformations ports
-            system_model.ignore_port_for_autoconnection Orocos::Spec::InputPort, 'dynamic_transformations', '/base/samples/RigidBodyState'
-        end
+        # For every composition, ignore all dynamic_transformations ports
+        system_model.ignore_port_for_autoconnection Orocos::Spec::InputPort, 'dynamic_transformations', '/base/samples/RigidBodyState'
     end
 
     Orocos::RobyPlugin::Engine.register_instanciation_postprocessing do |engine, plan|
