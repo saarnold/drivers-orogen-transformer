@@ -87,7 +87,7 @@ module TransformerPlugin
 	    task.in_base_hook('update', "
     {
 	const base::Time curTime(base::Time::now());
-	if(curTime - _lastStatusTime > base::Time::fromSeconds(1))
+	if(curTime - _lastStatusTime > base::Time::fromSeconds( _#{config.name}_period.value() ))
 	{
 	    _lastStatusTime = curTime;
 	    _#{config.name}_status.write(_#{config.name}.getStatus());
@@ -611,8 +611,14 @@ module TransformerPlugin
                 task.project.import_types_from('aggregator')
 
                 #add output port for status information
-                task.output_port("#{self.name}_status", '/aggregator/StreamAlignerStatus')
+                task.output_port("#{self.name}_status", '/aggregator/StreamAlignerStatus').
+		    doc "Status information on stream aligner internal state."
                 Orocos::Generation.info("transformer: adding port #{name}_status to #{task.name}")
+
+		#and property to set the period for writing the status information
+		task.property("#{self.name}_period", 'double', 1.0).
+		    doc "Minimum system time in s between two stream aligner status readings."
+		Orocos::Generation.info("Adding property #{name}_period to #{task.name}")
                 
                 #create ports for transformations
                 task.property('static_transformations', 'std::vector</base/samples/RigidBodyState>').
