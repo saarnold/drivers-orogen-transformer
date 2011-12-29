@@ -69,6 +69,10 @@ module TransformerPlugin
 		    base::Time::fromSeconds(#{stream.name}Period), boost::bind( &#{task.class_name}Base::#{callback_name(stream)}, this, _1, _2), #{stream.priority}, \"#{stream.name}\");
     }")
 
+		# disable streams in start hook, which are not connected
+		task.in_base_hook("start", "
+		    if( !_#{stream.name}.connected() ) _#{config.name}.disableStream( #{idx_name(stream)} );")
+
 		#unregister in cleanup
 		task.in_base_hook("cleanup", "     _#{config.name}.unregisterDataStream(#{idx_name(stream)});")
 	    end
