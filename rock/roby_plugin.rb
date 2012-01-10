@@ -1005,10 +1005,12 @@ module Transformer
                 end
             end
 
-            if !new_selection.empty?
+            if new_selection.empty?
+                task.select_frames(current_selection)
+            else
                 debug { "adding frame selection from #{task}: #{new_selection}" }
+                task.select_frames(new_selection)
             end
-            task.select_frames(current_selection.merge(new_selection))
         end
     end
 
