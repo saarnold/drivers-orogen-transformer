@@ -1,6 +1,10 @@
 require 'transformer'
 
 module Transformer
+    # Exception raised while propagating frame information when two different frames
+    # needs to be assigned to the same task's frame
+    class FrameMismatch < RuntimeError; end
+
     # Exception raised when a frame is being selected with #selected_frame, but
     # the selection is invalid
     #
