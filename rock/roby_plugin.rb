@@ -1157,7 +1157,9 @@ module Transformer
         # The configuration is overlaid over the current configuration. Use
         # #clean_transformer_conf to start it from scratch
         def load_transformer_conf(*path)
-            transformer_config.load_configuration(*path)
+            args = path + [:order => :specific_first]
+            file = Roby.app.find_file(*args)
+            transformer_config.load_configuration(file)
         end
 
         # Passes calls to the transformer config
