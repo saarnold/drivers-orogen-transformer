@@ -1,10 +1,6 @@
 require 'transformer'
 
 module Transformer
-    # Exception raised while propagating frame information when two different frames
-    # needs to be assigned to the same task's frame
-    class FrameMismatch < RuntimeError; end
-
     # Exception raised when a frame is being selected with #selected_frame, but
     # the selection is invalid
     #
@@ -30,6 +26,7 @@ module Transformer
             end
         end
     end
+
     # Exception raised when two different frames are being selected for the same
     # task/frame_name pair
     class FrameSelectionConflict < InvalidFrameSelection
@@ -40,7 +37,7 @@ module Transformer
 
         def initialize(task, frame, current, new)
             super(task, frame)
-            @current_frame = frame
+            @current_frame = current
             @new_frame = new
         end
 
@@ -56,6 +53,25 @@ module Transformer
             end
         end
     end
+
+    # Exception thrown in #merge if the merged task has a different frame
+    # selection than the merging task
+    class FrameSelectionConflictDuringMerge < FrameSelectionConflict
+        # The task that was being merged
+        attr_reader :merged_task
+
+        def initialize(merging_task, merged_task, frame, current, new)
+            super(merging_task, frame, current, new)
+            @merged_task = merged_task
+        end
+
+        def pretty_print(pp)
+            pp.text "while doing #{task}.merge(#{merged_task})"
+            pp.breakable
+            super
+        end
+    end
+
     # Exception raised when #select_frame is called on a static frame with a
     # different name than the frame's static name
     class StaticFrameChangeError < InvalidFrameSelection
@@ -216,7 +232,7 @@ module Transformer
 
         # Selects +selected_frame+ for the task's +frame_name+
         #
-        # @throws FrameMismatch if a different frame was already selected
+        # @throws FrameSelectionConflict if a different frame was already selected
         def select_frame(frame_name, selected_frame)
             if current = selected_frames[frame_name]
                 if current != selected_frame
@@ -463,7 +479,8 @@ module Transformer
 
             selected_frames.merge!(merged_task.selected_frames) do |k, v1, v2|
                 if v1 && v2 && v1 != v2
-                    raise FrameMismatch, "cannot merge #{merged_task} into #{self} as different frames are selected for #{k}: resp. #{v1} and #{v2}"
+                    raise FrameSelectionConflictDuringMerge.new(self, merged_task, k, v1, v2),
+                        "cannot merge #{merged_task} into #{self} as different frames are selected for #{k}: resp. #{v1} and #{v2}"
                 end
                 v1 || v2
             end
@@ -624,7 +641,8 @@ module Transformer
                 end
 
                 if ann.name != name
-                    raise FrameMismatch, "invalid network: frame #{frame_name} in #{task} would need to select both #{ann.selected_frame} and #{selected_frame}"
+                    raise FrameSelectionConflict.new(task, frame_name, selected_frame, ann.name),
+                        "invalid network: frame #{frame_name} in #{task} would need to select both #{ann.selected_frame} and #{selected_frame}"
                 end
             end
 
@@ -637,14 +655,20 @@ module Transformer
         class TransformAnnotation
             # The task on which we act
             attr_reader :task
+            # The task's frame name for the source of the transformation
+            attr_reader :from_frame
             # The selected source frame
             attr_reader :from
+            # The task's frame name for the target of the transformation
+            attr_reader :to_frame
             # The selected target frame
             attr_reader :to
 
-            def initialize(task, from, to)
+            def initialize(task, from_frame, from, to_frame, to)
                 @task = task
+                @from_frame = from_frame
                 @from = from
+                @to_frame = to_frame
                 @to   = to
             end
 
@@ -664,10 +688,10 @@ module Transformer
                 @from ||= ann.from
                 @to   ||= ann.to
                 if ann.from && ann.from != from
-                    raise FrameMismatch, "incompatible selection: #{ann.from} != #{@from}"
+                    raise FrameSelectionConflict.new(task, from_frame, from, ann.from), "incompatible selection: #{ann.from} != #{@from}"
                 end
                 if ann.to && ann.to != to
-                    raise FrameMismatch, "incompatible selection: #{ann.to} != #{@to}"
+                    raise FrameSelectionConflict.new(task, to_frame, to, ann.to), "incompatible selection: #{ann.to} != #{@to}"
                 end
             end
 
@@ -676,7 +700,7 @@ module Transformer
             end
 
             def to_s # :nodoc:
-                "#<TransformAnnotation: #{task} #{from} => #{to}>"
+                "#<TransformAnnotation: #{task} #{from_frame}=#{from} => #{to_frame}=#{to}>"
             end
         end
 
@@ -761,7 +785,7 @@ module Transformer
                                 end
                             else
                                 add_port_info(task, out_port.name,
-                                    TransformAnnotation.new(task, from, to))
+                                    TransformAnnotation.new(task, nil, from, nil, to))
                                 done_port_info(task, out_port.name)
                             end
                         elsif selected_frame
@@ -791,7 +815,7 @@ module Transformer
             tr.each_transform_output do |port, transform|
                 from = task.selected_frames[transform.from]
                 to   = task.selected_frames[transform.to]
-                add_port_info(task, port.name, TransformAnnotation.new(task, from, to))
+                add_port_info(task, port.name, TransformAnnotation.new(task, transform.from, from, transform.to, to))
                 if from && to
                     done_port_info(task, port.name)
                 end
@@ -799,7 +823,7 @@ module Transformer
             tr.each_transform_input do |port, transform|
                 from = task.selected_frames[transform.from]
                 to   = task.selected_frames[transform.to]
-                add_port_info(task, port.name, TransformAnnotation.new(task, from, to))
+                add_port_info(task, port.name, TransformAnnotation.new(task, transform.from, from, transform.to, to))
                 if from && to
                     done_port_info(task, port.name)
                 end
@@ -941,7 +965,7 @@ module Transformer
                 next if has_final_information_for_port?(task, port.name)
                 from = task.selected_frames[transform.from]
                 to   = task.selected_frames[transform.to]
-                add_port_info(task, port.name, TransformAnnotation.new(task, from, to))
+                add_port_info(task, port.name, TransformAnnotation.new(task, transform.from, from, transform.to, to))
                 if from && to
                     done_port_info(task, port.name)
                 else
