@@ -92,9 +92,39 @@ module Transformer
             end
         end
     end
-    # Exception raised during network generation if a required transformation
-    # chain cannot be fullfilled
-    class InvalidChain < RuntimeError; end
+
+    # Exception raised during network generation if the system cannot find a
+    # production chain for a transformation
+    class InvalidChain < RuntimeError
+        # The task for which the transformation was being produced
+        attr_reader :task
+        # The task-local name for the source frame
+        attr_reader :task_from
+        # The task-local name for the target frame
+        attr_reader :task_to
+        # The global name for the source frame
+        attr_reader :from
+        # The global name for the target frame
+        attr_reader :to
+        # The exception explaining the error
+        attr_reader :reason
+
+        def initialize(task, task_from, from, task_to, to, reason)
+            @task, @task_from, @from, @task_to, @to, @reason =
+                task, task_from, from, task_to, to, reason
+        end
+
+        def pretty_print(pp)
+            pp.text "cannot find a production chain for #{from} => #{to}"
+            pp.breakable
+            pp.text "  in #{task}"
+            pp.breakable
+            pp.text "  (task-local: #{task_from} => #{task_to})"
+            pp.breakable
+            reason.pretty_print(pp)
+        end
+    end
+
     # Exception raised during network generation if a declared producer cannot
     # provide the required transformation
     class TransformationPortNotFound < RuntimeError
@@ -1079,7 +1109,8 @@ module Transformer
                         config.transformation_chain(from, to, self_producers)
                     rescue Exception => e
                         if engine.options[:validate_network]
-                            raise InvalidChain, "cannot find a transformation chain to produce #{from} => #{to} for #{task} (task-local frames: #{trsf.from} => #{trsf.to}): #{e.message}", e.backtrace
+                            raise InvalidChain.new(task, trsf.from, from, trsf.to, to, e),
+                                "cannot find a transformation chain to produce #{from} => #{to} for #{task} (task-local frames: #{trsf.from} => #{trsf.to}): #{e.message}", e.backtrace
                         else
                             next
                         end
