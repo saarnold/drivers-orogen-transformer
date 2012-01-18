@@ -598,8 +598,6 @@ module TransformerPlugin
         def update_spec
             return if !needs_transformer?
 
-            task.project.import_types_from "base"
-
             Orocos::Generation.info("transformer: adding needs_configuration")
             task.needs_configuration
 
@@ -607,6 +605,7 @@ module TransformerPlugin
             if !task.has_property?("transformer_max_latency")
                 task.project.import_types_from "base"
                 task.project.using_library('transformer', :typekit => false)
+                task.project.import_types_from "transformer"
 
                 task.property("transformer_max_latency", 'double', max_latency).
                     doc "Maximum time in seconds the transformer will wait until it starts dropping samples"
@@ -749,3 +748,4 @@ class Orocos::Spec::TaskContext
         register_extension("transformer", config)
     end
 end
+
