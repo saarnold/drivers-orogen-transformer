@@ -207,6 +207,8 @@ module Transformer
     module InstanceRequirementsExtension
         # The set of frame mappings defined on this specification
         attribute(:frame_mappings) { Hash.new }
+        # The set of transformation producers defined on this specification
+        attribute(:transform_producers) { Hash.new }
 
         # Declare frame mappings
         #
@@ -217,6 +219,13 @@ module Transformer
         # will assign the "odometry" global frame to every task frame called "world".
         def use_frames(frame_mappings)
             self.frame_mappings.merge!(frame_mappings)
+            self
+        end
+
+        # Declare a specialized transformation producer for this requirements
+        # and its children
+        def use_transform_producer(from, to, producer)
+            self.transform_producers[[from, to]] = producer
             self
         end
 
@@ -232,6 +241,13 @@ module Transformer
                 else
                     sel0
                 end
+            end
+
+            transform_producers.merge!(other_spec.transform_producers) do |(from, to), sel0, sel1|
+                if sel0 != sel1
+                    raise ArgumentError, "cannot merge #{self} and #{other_spec}: producer for #{from} => #{to} differ (resp. #{sel0} and #{sel1})"
+                end
+                sel0
             end
         end
 
@@ -259,6 +275,24 @@ module Transformer
     # Module used to extend objects of the class Orocos::RobyPlugin::TaskContext
     module ComponentExtension
         attribute(:selected_frames) { Hash.new }
+        # The set of specialized transformation producers defined for this task
+        attribute(:transform_producers) { Hash.new }
+
+        def can_merge?(other)
+            if !(result = super)
+                return result
+            end
+
+            transform_producers.each do |from_to, spec|
+                if other_spec = other.transform_producers[from_to]
+                    if other_spec != spec
+                        return false
+                    end
+                end
+            end
+
+            return true
+        end
 
         # Selects +selected_frame+ for the task's +frame_name+
         #
@@ -320,6 +354,18 @@ module Transformer
         #
         def use_frames(*spec, &block)
             Orocos::RobyPlugin::Engine.create_instanciated_component(nil, nil, self).use_frames(*spec, &block)
+        end
+
+        # This returns an InstanciatedComponent object that can be used in
+        # other #use statements in the deployment spec
+        #
+        # For instance,
+        #
+        #   add(Cmp::CorridorServoing).
+        #       use(Project::Task.use_transform_producer('body', 'local_frame', Cmp::Actuator.use(Hokuyo::Task)))
+        #
+        def use_transform_producer(*spec, &block)
+            Orocos::RobyPlugin::Engine.create_instanciated_component(nil, nil, self).use_transform_producer(*spec, &block)
         end
     end
 
@@ -1069,6 +1115,21 @@ module Transformer
                 task.select_frames(new_selection)
             end
         end
+
+        def self.initialize_transform_producers(task, current_selection)
+            if task.requirements
+                new_selection = task.requirements.transform_producers
+            else
+                new_selection = Hash.new
+            end
+
+            task.transform_producers =
+                if new_selection.empty?
+                    current_selection.dup
+                else
+                    new_selection.dup
+                end
+        end
     end
 
     # Adds the transformation producers needed to properly setup the system.
@@ -1094,7 +1155,7 @@ module Transformer
                     next
                 end
 
-                self_producers = Hash.new
+                self_producers = task.transform_producers.dup
                 tr.each_transform_port do |port, transform|
                     if port.kind_of?(Orocos::Spec::InputPort) && task.connected?(port.name)
                         port_from = task.selected_frames[transform.from]
@@ -1154,8 +1215,8 @@ module Transformer
         attr_predicate :transformer_enabled?, true
 
         # Holds the Transformer::TransformationManager object that stores the
-        # current transformer configuration (static/dynamic transformation
-        # configuration)
+        # current global transformer configuration (static/dynamic
+        # transformation configuration)
         attribute(:transformer_config) do
             Transformer::TransformationManager.new do |producer|
                 if !self.valid_definition?(producer)
@@ -1217,8 +1278,10 @@ module Transformer
             tasks = plan.find_local_tasks(Orocos::RobyPlugin::Component).roots(Roby::TaskStructure::Hierarchy)
             tasks.each do |root_task|
                 FramePropagation.initialize_selected_frames(root_task, Hash.new)
+                FramePropagation.initialize_transform_producers(root_task, Hash.new)
                 Roby::TaskStructure::Hierarchy.each_bfs(root_task, BGL::Graph::ALL) do |from, to, info|
                     FramePropagation.initialize_selected_frames(to, from.selected_frames)
+                    FramePropagation.initialize_transform_producers(to, from.transform_producers)
                 end
             end
         end
