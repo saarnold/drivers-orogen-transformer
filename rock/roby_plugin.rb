@@ -283,6 +283,14 @@ module Transformer
                 return result
             end
 
+            selected_frames.each do |task_frame, selected_frame|
+                if other_sel = other.selected_frames[task_frame]
+                    if other_sel != selected_frame
+                        return false
+                    end
+                end
+            end
+
             transform_producers.each do |from_to, spec|
                 if other_spec = other.transform_producers[from_to]
                     if other_spec != spec
