@@ -674,6 +674,7 @@ module Transformer
                     raise FrameSelectionConflict.new(task, frame_name, selected_frame, ann.name),
                         "invalid network: frame #{frame_name} in #{task} would need to select both #{ann.selected_frame} and #{selected_frame}"
                 end
+                false
             end
 
             def to_s
@@ -715,6 +716,7 @@ module Transformer
                     raise ArgumentError, "cannot merge a frame annotation with a transform annotation. You are probably connecting two ports, one declared as a transform input or output and one only associated with a frame"
                 end
 
+                changed = (@from != ann.from) || (@to != ann.to)
                 @from ||= ann.from
                 @to   ||= ann.to
                 if ann.from && ann.from != from
@@ -723,6 +725,7 @@ module Transformer
                 if ann.to && ann.to != to
                     raise FrameSelectionConflict.new(task, to_frame, to, ann.to), "incompatible selection: #{ann.to} != #{@to}"
                 end
+                changed
             end
 
             def pretty_print(pp)
