@@ -1233,6 +1233,25 @@ module Transformer
             end
         end
 
+        attribute(:selected_frames) { Hash.new }
+
+        # Declare a global selection for a frame. 
+        def use_frames(spec)
+            selected_frames.merge!(spec)
+            self
+        end
+
+        attribute(:transform_producers) { Hash.new }
+
+        # Declare a global selection for dynamic frame production. This can be
+        # used to override settings in the transformer configuration file, and
+        # in order to be consistent with the #use_transform_producer statement
+        # on instance requirements
+        def use_transform_producer(from, to, spec)
+            transform_producers[[from, to]] = spec
+            self
+        end
+
         # During network validation, checks that all required frames have been
         # configured
         def validate_generated_network(plan, options)
@@ -1285,12 +1304,13 @@ module Transformer
             # objects to the selected_frames hashes on the tasks
             tasks = plan.find_local_tasks(Orocos::RobyPlugin::Component).roots(Roby::TaskStructure::Hierarchy)
             tasks.each do |root_task|
-                FramePropagation.initialize_selected_frames(root_task, Hash.new)
-                FramePropagation.initialize_transform_producers(root_task, Hash.new)
+                FramePropagation.initialize_selected_frames(root_task, engine.selected_frames.dup)
+                FramePropagation.initialize_transform_producers(root_task, engine.transform_producers.dup)
                 Roby::TaskStructure::Hierarchy.each_bfs(root_task, BGL::Graph::ALL) do |from, to, info|
                     FramePropagation.initialize_selected_frames(to, from.selected_frames)
                     FramePropagation.initialize_transform_producers(to, from.transform_producers)
                 end
+
             end
         end
     end
