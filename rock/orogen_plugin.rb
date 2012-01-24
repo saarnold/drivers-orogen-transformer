@@ -25,13 +25,15 @@ module TransformerPlugin
 		    initializer("#{member_name(t)}(_#{config.name}.registerTransformation(\"#{t.from}\", \"#{t.to}\"))")
 	    end
 
-            # Apply the frame selection from the properties inside the startHook
+            # Apply the frame selection from the properties inside the configureHook
             frame_selection = config.each_dynamically_mapped_frame.map do |frame_name|
                 "    _#{config.name}.setFrameMapping(\"#{frame_name}\", _#{frame_name}_frame);"
             end
-            task.in_base_hook("start", frame_selection.join("\n"))
+            task.in_base_hook("configure", frame_selection.join("\n"))
 
-            task.in_base_hook("start",
+	    # Read out the properties which contains a vector of static transforms
+	    # and push them to the transformer
+            task.in_base_hook("configure",
 "    std::vector<base::samples::RigidBodyState> const& staticTransforms =
         _static_transformations.set();
      for (size_t i = 0; i < staticTransforms.size(); ++i)
