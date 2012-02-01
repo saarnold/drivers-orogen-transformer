@@ -1151,6 +1151,8 @@ module Transformer
             next if !(tr = task.model.transformer)
             Transformer.debug { "computing needed static and dynamic transformations for #{task}" }
 
+            static_transforms  = Hash.new
+            dynamic_transforms = Hash.new { |h, k| h[k] = Array.new }
             tr.each_needed_transformation do |trsf|
                 from = task.selected_frames[trsf.from]
                 to   = task.selected_frames[trsf.to]
@@ -1195,21 +1197,31 @@ module Transformer
                     Transformer.debug "#{dynamic.size} dynamic transformations"
                     break
                 end
-                task.static_transforms = static
+
+                static.each do |trsf|
+                    static_transforms[[trsf.from, trsf.to]] = trsf
+                end
                 dynamic.each do |dyn|
                     if dyn.producer.kind_of?(Orocos::Spec::InputPort)
                         next
                     end
+                    dynamic_transforms[dyn.producer] << dyn
+                end
+            end
 
-                    producer_task = engine.add_instance(dyn.producer)
+            task.static_transforms = static_transforms.values
+            dynamic_transforms.each do |producer, transformations|
+                producer_task = engine.add_instance(producer)
+                task.should_start_after producer_task.start_event
+                transformations.each do |dyn|
+                    task.depends_on(producer_task, :role => "transformer_#{dyn.from}2#{dyn.to}")
+
                     out_port = producer_task.find_port_for_transform(dyn.from, dyn.to)
                     if !out_port
                         raise TransformationPortNotFound.new(producer_task, dyn.from, dyn.to)
                     end
                     producer_task.select_port_for_transform(out_port, dyn.from, dyn.to)
                     producer_task.connect_ports(task, [out_port.name, "dynamic_transformations"] => Hash.new)
-                    task.depends_on(producer_task, :role => "transformer_#{dyn.from}2#{dyn.to}")
-                    task.should_start_after producer_task.start_event
                 end
             end
         end
