@@ -729,6 +729,10 @@ end
 
 
 class Orocos::Spec::TaskContext
+    def has_transformer?
+        !!find_extension("transformer")
+    end
+
     def transformer(&block)
         if !block_given?
             return find_extension("transformer")

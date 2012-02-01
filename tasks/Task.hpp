@@ -25,35 +25,10 @@ namespace transformer {
     {
 	friend class TaskBase;
     protected:
-        std::vector<PortFrameAssociation> mPortFrame;;
-        std::vector<PortTransformationAssociation> mPortTransform;
-        std::vector<base::samples::RigidBodyState> mStaticTransforms;
 
-        bool hasPortFrameAssociation(std::string const& task, std::string const& port) const;
-        bool hasPortFrameAssociation(std::string const& task, std::string const& port, std::string const& frame) const;
-        bool hasPortTransformationAssociation(std::string const& task, std::string const& port) const;
-        bool hasPortTransformationAssociation(std::string const& task, std::string const& port, std::string const& from_frame, std::string const& to_frame) const;
-
-        void pushState();
-
-        /* Handler for the addPortFrameAssociation operation
+        /* Handler for the setConfiguration operation
          */
-        virtual bool addPortFrameAssociation(::std::string const & task, ::std::string const & port, ::std::string const & frame);
-        /* Handler for the addPortTransformationAssociation operation
-         */
-        virtual bool addPortTransformationAssociation(::std::string const & task, ::std::string const & port, ::std::string const & from_frame, ::std::string const & to_frame);
-        /* Handler for the removeAllPortFrameAssociations operation
-         */
-        virtual bool removeAllPortFrameAssociations(::std::string const & task, ::std::string const & port);
-        /* Handler for the removeAllPortTransformationAssociations operation
-         */
-        virtual bool removeAllPortTransformationAssociations(::std::string const & task, ::std::string const & port);
-        /* Handler for the removePortFrameAssociation operation
-         */
-        virtual bool removePortFrameAssociation(::std::string const & task, ::std::string const & port, ::std::string const & frame);
-        /* Handler for the removePortTransformationAssociation operation
-         */
-        virtual bool removePortTransformationAssociation(::std::string const & task, ::std::string const & port, ::std::string const & from_frame, ::std::string const & to_frame);
+        virtual void setConfiguration(::transformer::ConfigurationState const & configuration);
 
     public:
         /** TaskContext constructor for Task
@@ -129,7 +104,7 @@ namespace transformer {
          * from Stopped to PreOperational, requiring the call to configureHook()
          * before calling start() again.
          */
-        void cleanupHook();
+        // void cleanupHook();
     };
 }
 
