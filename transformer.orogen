@@ -1,16 +1,114 @@
 name "transformer"
 
 import_types_from "base"
-
+import_types_from "BroadcastTypes.hpp"
 typekit do
-    if type_export_policy == :used
-        # We assume that, if the caller wants a 'used' type policy, it means he
-        # wants partial exports. Move to 'selected'. oroGen would have changed
-        # it to 'all'
-        type_export_policy :selected
-    end
-
     # This one is actually for the transformer plugin, but we want to avoid
     # adding a new package just for that
     export_types '/std/vector</base/samples/RigidBodyState>'
 end	
+
+# Task that allows to broadcast transformer information, mostly used for GUI
+task_context "Task" do
+    # Declares a new frame-to-port association
+    #
+    # The task argument must be a unique way to identify a task. The port is a
+    # port (input or output on this task). Finally, the frame is the unique
+    # global name in which the data of port.task is expressed.
+    #
+    # Returns false if the port is already associated with a transformation (it
+    # cannot be both associated with a transformation and a frame at the same
+    # time)
+    operation("addPortFrameAssociation").
+        returns("bool").
+        arg("task", "/std/string").
+        arg("port", "/std/string").
+        arg("frame", "/std/string")
+
+    # Removes an association between a port and a frame
+    #
+    # The task argument must be a unique way to identify a task. The port is a
+    # port (input or output on this task). If a frame is given, only the
+    # association to this frame is going to be removed
+    #
+    # Returns false if no such associations existed
+    operation("removePortFrameAssociation").
+        returns("bool").
+        arg("task", "/std/string").
+        arg("port", "/std/string").
+        arg("frame", "/std/string")
+
+    # Removes all declared frame  associations between for a port
+    #
+    # The task argument must be a unique way to identify a task. The port is a
+    # port (input or output on this task). The frame is the global frame name of
+    # the frame that should not be associated with the data anymore
+    #
+    # Returns false if the port had no associated frames
+    operation("removeAllPortFrameAssociations").
+        returns("bool").
+        arg("task", "/std/string").
+        arg("port", "/std/string")
+
+    # Declares a new transformation-to-port association
+    #
+    # The task argument must be a unique way to identify a task. The port is a
+    # port (input or output on this task). Finally, the frame is the unique
+    # global name in which the data of port.task is expressed.
+    #
+    # Returns false if the port is already associated with a frame (it
+    # cannot be both associated with a transformation and a frame at the same
+    # time)
+    operation("addPortTransformationAssociation").
+        returns("bool").
+        arg("task", "/std/string").
+        arg("port", "/std/string").
+        arg("from_frame", "/std/string").
+        arg("to_frame", "/std/string")
+
+    # Removes an association between a port and a transformation
+    #
+    # The task argument must be a unique way to identify a task. The port is a
+    # port (input or output on this task).
+    #
+    # Returns false if no such associations existed
+    operation("removePortTransformationAssociation").
+        returns("bool").
+        arg("task", "/std/string").
+        arg("port", "/std/string").
+        arg("from_frame", "/std/string").
+        arg("to_frame", "/std/string")
+
+    # Removes all declared frame  associations between for a port
+    #
+    # The task argument must be a unique way to identify a task. The port is a
+    # port (input or output on this task). If a frame is given, only the
+    # association to this frame is going to be removed
+    #
+    # Returns false if the port had no associated transformation
+    operation("removeAllPortTransformationAssociations").
+        returns("bool").
+        arg("task", "/std/string").
+        arg("port", "/std/string")
+
+    # Adds a new static transformation to the configuration
+    operation('addStaticTransform').
+        arg("transform", "base/samples/RigidBodyState")
+
+    # Removes a registered static transformation from the configuration
+    operation('removeStaticTransform').
+        arg("transform", "base/samples/RigidBodyState")
+
+    # Removes a registered static transformation from the configuration
+    operation('removeAllStaticTransforms').
+        arg("transform", "base/samples/RigidBodyState")
+
+    # Outputs a snapshot of all the port-to-frame associations declared at a
+    # certain point in time. The port is declared so that
+    #
+    #   port_frame_associations.connect_to(input_port, :init => true)
+    #
+    # will send the last known state to the input port
+    output_port "configuration_state", "transformer/ConfigurationState"
+end
+
