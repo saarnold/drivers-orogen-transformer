@@ -53,10 +53,20 @@ module Transformer
         # provider
         def resolve_producer(dyn)
             producer_name, producer_port_name = dyn.producer.split('.')
-            producer_task = Orocos::TaskContext.get(producer_name)
+            producer_task =
+                begin Orocos::TaskContext.get(producer_name)
+                rescue Orocos::NotFound
+                    Transformer.warn "#{producer_name}, which is registered as the producer of #{dyn.from} => #{dyn.to}, cannot be contacted"
+                    raise
+                end
 
             if producer_port_name
-                return producer_task.port(producer_port_name)
+                begin
+                    return producer_task.port(producer_port_name)
+                rescue Orocos::NotFound
+                    Transformer.warn "#{producer_name}.#{producer_port_name}, which is registered as the producer of #{dyn.from} => #{dyn.to}, does not exist on #{producer_task.name} (#{producer_task.model.name})"
+                    raise
+                end
             else
                 candidates = producer_task.enum_for(:each_output_port).find_all do |p|
                     p.orocos_type_name == "/base/samples/RigidBodyState"
@@ -64,7 +74,7 @@ module Transformer
                 if candidates.empty?
                     raise InvalidTransformProducer.new(dyn), "found no RigidBodyState port on #{producer_name}, declared as the producer of #{dyn.from} => #{dyn.to}"
                 elsif candidates.size > 1
-                    raise InvalidTransformProducer.new(dyn), "more than one RigidBodyState port found on #{producer_name}, specify the producer of #{dyn.from} => #{dyn.to} as task_name.port_name"
+                    raise InvalidTransformProducer.new(dyn), "more than one RigidBodyState port found on #{producer_name}: #{candidates.map(&:name).sort.join(", ")}, specify the producer of #{dyn.from} => #{dyn.to} as task_name.port_name"
                 end
                 return candidates.first
             end
