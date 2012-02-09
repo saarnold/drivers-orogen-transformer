@@ -179,7 +179,6 @@ module Transformer
                     end
 
             # Make sure the component is running
-            # pp configuration_state
             if !broadcaster.running?
                 broadcaster.start
             end
