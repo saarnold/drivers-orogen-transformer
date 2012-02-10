@@ -185,8 +185,9 @@ module Transformer
             broadcaster.setConfiguration(configuration_state)
         end
 
-        def start_broadcaster(name = Transformer.broadcaster_name)
-            Orocos::Process.run('transformer::Task' => name) do
+        def start_broadcaster(name = Transformer.broadcaster_name, options = Hash.new)
+            options = options.merge('transformer::Task' => name)
+            Orocos::Process.run(options) do
                 @broadcaster = Orocos::TaskContext.get(name)
                 yield
             end
