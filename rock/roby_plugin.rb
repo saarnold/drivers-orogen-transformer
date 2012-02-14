@@ -1234,15 +1234,32 @@ module Transformer
     module EngineExtension
         attr_predicate :transformer_enabled?, true
 
+        # Module used to hook the Roby find-path mechanisms into the
+        # transformer's loading mechanisms
+        module LoadMechanismOverride
+            def load(*conf)
+                args = conf + [:order => :specific_first]
+                file = Roby.app.find_file(*args)
+                if !file
+                    raise ArgumentError, "cannot find #{conf.join("/")} in the Roby application path"
+                end
+                super(file)
+            end
+        end
+
         # Holds the Transformer::TransformationManager object that stores the
         # current global transformer configuration (static/dynamic
         # transformation configuration)
         attribute(:transformer_config) do
-            Transformer::TransformationManager.new do |producer|
+            manager = Transformer::TransformationManager.new do |producer|
                 if !self.valid_definition?(producer)
                     raise ArgumentError, "#{producer} is not a known device, definition or instance requirements object"
                 end
             end
+            # Redefine override the load method to go through Roby's find
+            # mechanisms
+            manager.conf.extend LoadMechanismOverride
+            manager
         end
 
         attribute(:selected_frames) { Hash.new }
@@ -1291,9 +1308,7 @@ module Transformer
         # The configuration is overlaid over the current configuration. Use
         # #clean_transformer_conf to start it from scratch
         def load_transformer_conf(*path)
-            args = path + [:order => :specific_first]
-            file = Roby.app.find_file(*args)
-            transformer_config.load_configuration(file)
+            transformer_config.conf.load_transformer_conf(*path)
         end
 
         # Passes calls to the transformer config
