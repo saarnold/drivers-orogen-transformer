@@ -859,7 +859,7 @@ module Transformer
                     #    definitions). Assign the selected frame
                     #  - the device is NOT using the transformer. Therefore,
                     #    we must only add the relevant port info
-                    srv.each_output_port(true) do |out_port|
+                    srv.each_task_output_port(true) do |out_port|
                         # Do not associate the ports that output transformations
                         if selected_transform && Transformer.transform_port?(out_port)
                             from, to = selected_transform.from, selected_transform.to
@@ -1095,7 +1095,7 @@ module Transformer
                     # This part covers the part where we have to store the frame
                     # selection (first part). The second part is covered in
                     # #initial_information
-                    srv.each_output_port(true) do |out_port|
+                    srv.each_task_output_port(true) do |out_port|
                         # Do not associate the ports that output transformations
                         if selected_transform && Transformer.transform_port?(out_port)
                             from, to = selected_transform.from, selected_transform.to
