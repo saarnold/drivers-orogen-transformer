@@ -436,8 +436,79 @@ module Transformer
         end
     end
 
+    module ConcreteComponentExtension
+        # Returns an output port object that is providing the requested
+        # transformation, or nil if none can be found
+        #
+        # Raises TransformationPortAmbiguity if multiple ports match.
+        def find_port_for_transform(from, to)
+            not_candidates = []
+            candidates = []
+            each_transform_output do |port, port_from, port_to|
+                if port_from == from && port_to == to
+                    return port
+                elsif ((!port_from || port_from == from) && (!port_to || port_to == to))
+                    candidates << port
+                else
+                    not_candidates << port
+                end
+            end
+
+            if candidates.size == 1
+                return candidates.first
+            elsif candidates.size > 1
+                raise TransformationPortAmbiguity.new(self, from, to, candidates)
+            end
+
+            model.each_output_port do |port|
+                next if not_candidates.include?(port)
+                if Transformer.transform_port?(port)
+                    candidates << port
+                end
+            end
+
+            if candidates.size == 1
+                return candidates.first
+            elsif candidates.size > 1
+                raise TransformationPortAmbiguity.new(self, from, to, candidates)
+            end
+
+            return nil
+        end
+    end
+
+    module DataServiceInstanceExtension
+        include ConcreteComponentExtension
+
+        def each_transform_output
+            mappings = model.port_mappings_for_task
+            task.each_transform_output do |port, port_from, port_to|
+                if mapped = mappings.find { |_, task_port| port.name == task_port }
+                    yield(model.find_output_port(mapped.first), port_from, port_to)
+                end
+            end
+        end
+
+        # Given a port associated with a transformer transformation, assign the
+        # given frames to this local transformation
+        def select_port_for_transform(port, from, to)
+            task_port_name = model.port_mappings_for_task[port.name]
+            if !task_port_name
+                raise ArgumentError, "#{port.name} is not a known output port of #{self}"
+            end
+
+            task_port = task.model.find_output_port(task_port_name)
+            if !task_port
+                raise ArgumentError, "#{port} is not an output port of #{self}"
+            end
+            task.select_port_for_transform(task_port, from, to)
+        end
+    end
+
     # Module that extends the TaskContext class itself
     module TaskContextExtension
+        include ConcreteComponentExtension
+
         # The set of static transformations that should be provided to the
         # component at configuration time
         attribute(:static_transforms) { Array.new }
@@ -476,50 +547,13 @@ module Transformer
             end
         end
 
-        # Returns an output port object that is providing the requested
-        # transformation, or nil if none can be found
-        #
-        # Raises TransformationPortAmbiguity if multiple ports match.
-        def find_port_for_transform(from, to)
-            return if !(tr = model.transformer)
-
-            not_candidates = []
-            candidates = []
-            each_transform_output do |port, port_from, port_to|
-                if port_from == from && port_to == to
-                    return port
-                elsif ((!port_from || port_from == from) && (!port_to || port_to == to))
-                    candidates << port
-                else
-                    not_candidates << port
-                end
-            end
-
-            if candidates.size == 1
-                return candidates.first
-            elsif candidates.size > 1
-                raise TransformationPortAmbiguity.new(self, from, to, candidates)
-            end
-
-            model.each_output_port do |port|
-                next if not_candidates.include?(port)
-                if Transformer.transform_port?(port)
-                    candidates << port
-                end
-            end
-
-            if candidates.size == 1
-                return candidates.first
-            elsif candidates.size > 1
-                raise TransformationPortAmbiguity.new(self, from, to, candidates)
-            end
-
-            return nil
-        end
-
         # Given a port associated with a transformer transformation, assign the
         # given frames to this local transformation
         def select_port_for_transform(port, from, to)
+            if model.find_output_port(port.name) != port
+                raise ArgumentError, "#{port.name} is not an output port of #{self}"
+            end
+
             if !(tr = model.transformer)
                 tr = model.transformer do
                     transform_output port.name, from => to
@@ -1212,7 +1246,7 @@ module Transformer
             task.static_transforms = static_transforms.values
             dynamic_transforms.each do |producer, transformations|
                 producer_task = engine.add_instance(producer)
-                task.should_start_after producer_task.start_event
+                task.should_start_after producer_task.as_plan.start_event
                 transformations.each do |dyn|
                     task.depends_on(producer_task, :role => "transformer_#{dyn.from}2#{dyn.to}")
 
@@ -1357,6 +1391,7 @@ Orocos::RobyPlugin::Component.include Transformer::ComponentExtension
 Orocos::RobyPlugin::Component.extend Transformer::ComponentModelExtension
 Orocos::RobyPlugin::TaskContext.include Transformer::TaskContextExtension
 Orocos::RobyPlugin::Composition.include Transformer::CompositionExtension
+Orocos::RobyPlugin::DataServiceInstance.include Transformer::DataServiceInstanceExtension
 
 Orocos::RobyPlugin::DeviceInstance.include Transformer::DeviceExtension
 Orocos::RobyPlugin::Graphviz.include Transformer::GraphvizExtension
