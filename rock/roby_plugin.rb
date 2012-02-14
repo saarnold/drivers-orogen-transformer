@@ -77,7 +77,7 @@ module Transformer
     class StaticFrameChangeError < InvalidFrameSelection
         # The name of the frame that was being assigned to a static frame
         attr_reader :new_frame
-        def initialize(task, frame, current, new)
+        def initialize(task, frame, new)
             super(task, frame)
             @new_frame = new
         end
@@ -584,7 +584,7 @@ module Transformer
                 selection.each do |local_frame, global_frame|
                     # If the frame is not configurable, raise
                     if tr.static?(local_frame) && local_frame != global_frame
-                        raise StaticFrameChangeError.new(self, local_frame), "cannot select a frame name different than #{local_frame} for #{self}, as the component does not support configuring that frame"
+                        raise StaticFrameChangeError.new(self, local_frame, global_frame), "cannot select #{global_frame} for the local frame #{local_frame} in #{self}, as the component does not support configuring that frame"
                     end
                 end
             end
