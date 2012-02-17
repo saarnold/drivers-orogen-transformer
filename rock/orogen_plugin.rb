@@ -16,17 +16,26 @@ module TransformerPlugin
     _#{config.name}.setTimeout( base::Time::fromSeconds( _transformer_max_latency.value()) );
 	    ")	    
 	    
-	    config.each_needed_transformation.each do |t|
+            task.add_base_member("transformer_status", "transformerStatus", "transformer::TransformerStatus")
+            needed_transformations = config.each_needed_transformation.sort_by { |t| [t.from, t.to] }
+            status_update_code = []
+	    needed_transformations.each_with_index do |t, i|
                 # BIG FAT WARNING: the key used here for #add_base_member MUST
                 # be lexicographically bigger than "transformer" to make sure
                 # that the transformer object is constructed before these
                 # members
 		task.add_base_member("transformer_transformation", member_name(t), "transformer::Transformation &").
 		    initializer("#{member_name(t)}(_#{config.name}.registerTransformation(\"#{t.from}\", \"#{t.to}\"))")
+                status_update_code << "#{member_name(t)}.updateStatus(transformerStatus.transformations[#{i}]);"
 	    end
+            task.in_base_hook("configure", "transformerStatus.transformations.clear(); transformerStatus.transformations.resize(#{needed_transformations.size});")
+            status_update_code << "transformerStatus.time = base::Time::now();"
+            status_update_code << "_#{config.name}_status.write(transformerStatus);"
+            task.add_base_method("void", "updateTransformerStatus").
+                body(status_update_code.join("\n  "))
 
             # Apply the frame selection from the properties inside the configureHook
-            frame_selection = config.each_dynamically_mapped_frame.map do |frame_name|
+            frame_selection = config.each_dynamically_mapped_frame.sort.map do |frame_name|
                 "    _#{config.name}.setFrameMapping(\"#{frame_name}\", _#{frame_name}_frame);"
             end
             task.in_base_hook("configure", frame_selection.join("\n"))
@@ -40,7 +49,7 @@ module TransformerPlugin
         _#{config.name}.pushStaticTransformation(staticTransforms[i]);
 ")
 
-	    config.streams.each do |stream|
+	    config.streams.sort_by(&:name).each do |stream|
 		stream_data_type = type_cxxname(task, stream)
 
 		# Pull the data in the update hook
@@ -90,13 +99,18 @@ module TransformerPlugin
 	;
     }")
 
+            # Build the transformer status update method
+            update_method = []
+
+
 	    task.in_base_hook('update', "
     {
 	const base::Time curTime(base::Time::now());
-	if(curTime - _lastStatusTime > base::Time::fromSeconds( _#{config.name}_period.value() ))
+	if(curTime - _lastStatusTime > base::Time::fromSeconds( _#{config.name}_status_period.value() ))
 	{
 	    _lastStatusTime = curTime;
-	    _#{config.name}_status.write(_#{config.name}.getStatus());
+	    _#{config.name}_stream_aligner_status.write(_#{config.name}.getStatus());
+            updateTransformerStatus();
 	}
     }")
 
@@ -604,26 +618,27 @@ module TransformerPlugin
             task.needs_configuration
 
             # Don't add the general stuff if it has already been added
-            if !task.has_property?("transformer_max_latency")
+            if !task.has_property?("#{name}_max_latency")
                 task.project.import_types_from "base"
                 task.project.using_library('transformer', :typekit => false)
                 task.project.import_types_from "transformer"
 
-                task.property("transformer_max_latency", 'double', max_latency).
+                task.property("#{name}_max_latency", 'double', max_latency).
                     doc "Maximum time in seconds the transformer will wait until it starts dropping samples"
-                Orocos::Generation.info("transformer: adding property transformer_max_latency to #{task.name}")
+                Orocos::Generation.info("transformer: adding property #{name}_max_latency to #{task.name}")
 
                 task.project.import_types_from('aggregator')
 
-                #add output port for status information
-                task.output_port("#{self.name}_status", '/aggregator/StreamAlignerStatus').
-		    doc "Status information on stream aligner internal state."
+                ## Status ports and period property
+                task.output_port("#{name}_stream_aligner_status", '/aggregator/StreamAlignerStatus').
+		    doc "Status information on the stream aligner that is underlying the transformer."
                 Orocos::Generation.info("transformer: adding port #{name}_status to #{task.name}")
-
-		#and property to set the period for writing the status information
-		task.property("#{self.name}_period", 'double', 1.0).
-		    doc "Minimum system time in s between two stream aligner status readings."
-		Orocos::Generation.info("Adding property #{name}_period to #{task.name}")
+                task.output_port("#{name}_status", 'transformer/TransformerStatus').
+                    doc "Status information on the transformer internal state"
+                Orocos::Generation.info("transformer: adding output port #{name}_status to #{task.name}")
+		task.property("#{name}_status_period", 'double', 1.0).
+		    doc "Minimum system time in seconds between two updates of the status ports"
+		Orocos::Generation.info("Adding property #{name}_status_period to #{task.name}")
                 
                 #create ports for transformations
                 task.property('static_transformations', 'std::vector</base/samples/RigidBodyState>').
