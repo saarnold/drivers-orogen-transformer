@@ -115,7 +115,7 @@ module TransformerPlugin
     }")
 
 	    #unregister in cleanup
-	    task.in_base_hook("stop", "
+	    task.in_base_hook("cleanup", "
     _#{config.name}.clear();")
 	end
 
