@@ -335,7 +335,7 @@ module TransformerPlugin
 	
         # Requires the transformer to align the given input port on the
         # transformations
-	def align_port(name, period, priority = nil)
+	def align_port(name, period = 0, priority = nil)
             if !task.has_input_port?(name)
                 raise ArgumentError, "#{task.name} has no input port called #{name}, cannot align"
             end
