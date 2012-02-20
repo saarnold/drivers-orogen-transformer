@@ -566,7 +566,7 @@ module TransformerPlugin
         # transformation between the given frames.
         def transform_input(port_name, transform)
             if !task.has_input_port?(port_name)
-                raise ArgumentError, "task #{task.name} has no input port called #{pname}"
+                raise ArgumentError, "task #{task.name} has no input port called #{port_name}"
             end
             spec = transform_port(port_name, transform)
             transform_inputs[task.find_input_port(port_name)] = spec
@@ -577,7 +577,7 @@ module TransformerPlugin
         # transformation between the given frames.
         def transform_output(port_name, transform)
             if !task.has_output_port?(port_name)
-                raise ArgumentError, "task #{task.name} has no output port called #{pname}"
+                raise ArgumentError, "task #{task.name} has no output port called #{port_name}"
             end
             spec = transform_port(port_name, transform)
             transform_outputs[task.find_output_port(port_name)] = spec
