@@ -1178,11 +1178,11 @@ module Transformer
     #
     # +engine.transformer_config+ must contain the transformation configuration
     # object.
-    def self.add_needed_producers(engine, plan)
-        config = engine.transformer_config
+    def self.add_needed_producers(engine, tasks)
+        config = Orocos.transformer.manager
 
-        plan.find_local_tasks(Orocos::RobyPlugin::TaskContext).each do |task|
-            next if !(tr = task.model.transformer)
+        tasks.each do |task|
+            tr = task.model.transformer
             Transformer.debug { "computing needed static and dynamic transformations for #{task}" }
 
             static_transforms  = Hash.new
@@ -1261,6 +1261,48 @@ module Transformer
         end
     end
 
+    def self.update_configuration_state(state, tasks)
+        state.port_transformation_associations.clear
+        state.port_frame_associations.clear
+        state.static_transformations =
+            Orocos.transformer.manager.conf.
+                enum_for(:each_static_transform).map do |static|
+                    rbs = Types::Base::Samples::RigidBodyState.invalid
+                    rbs.sourceFrame = static.from
+                    rbs.targetFrame = static.to
+                    rbs.position = static.translation
+                    rbs.orientation = static.rotation
+                    rbs
+                end
+
+        tasks.each do |task|
+            tr = task.model.transformer
+            task_name = task.orocos_name
+            tr.each_annotated_port do |port, frame_name|
+                selected_frame = task.selected_frames[frame_name]
+                if selected_frame
+                    info = Types::Transformer::PortFrameAssociation.new(
+                        :task => task_name, :port => port.name, :frame => selected_frame)
+                    state.port_frame_associations << info
+                else
+                    Transformer.warn "no frame selected for #{frame_name} on #{task}. This is harmless for the network to run, but will make the display of #{port.name} \"in the right frame\" impossible"
+                end
+            end
+            tr.each_transform_port do |port, transform|
+                from = task.selected_frames[transform.from]
+                to   = task.selected_frames[transform.to]
+                if from && to
+                    info = Types::Transformer::PortTransformationAssociation.new(
+                        :task => task_name, :port => port.name,
+                        :from_frame => from, :to_frame => to)
+                    state.port_transformation_associations << info
+                else
+                    Transformer.warn "no frame selected for #{transform.to} on #{task}. This is harmless for the network to run, but might remove some options during display"
+                end
+            end
+        end
+    end
+
     # Exception raised when a needed frame is not assigned
     class MissingFrame < RuntimeError; end
 
@@ -1281,19 +1323,10 @@ module Transformer
             end
         end
 
-        # Holds the Transformer::TransformationManager object that stores the
-        # current global transformer configuration (static/dynamic
-        # transformation configuration)
-        attribute(:transformer_config) do
-            manager = Transformer::TransformationManager.new do |producer|
-                if !self.valid_definition?(producer)
-                    raise ArgumentError, "#{producer} is not a known device, definition or instance requirements object"
-                end
-            end
-            # Redefine override the load method to go through Roby's find
-            # mechanisms
-            manager.conf.extend LoadMechanismOverride
-            manager
+        Orocos.transformer.manager.conf.extend LoadMechanismOverride
+
+        attribute(:transformer_configuration_state) do
+            [Time.now, Types::Transformer::ConfigurationState.new]
         end
 
         attribute(:selected_frames) { Hash.new }
@@ -1342,13 +1375,13 @@ module Transformer
         # The configuration is overlaid over the current configuration. Use
         # #clean_transformer_conf to start it from scratch
         def load_transformer_conf(*path)
-            transformer_config.conf.load_transformer_conf(*path)
+            Orocos.transformer.manager.conf.load_transformer_conf(*path)
         end
 
         # Passes calls to the transformer config
         def method_missing(m, *args, &block)
             if m == :static_transform || m == :dynamic_transform || m == :frames
-                return transformer_config.conf.send(m, *args, &block)
+                return Orocos.transformer.manager.conf.send(m, *args, &block)
             end
             super
         end
@@ -1361,6 +1394,12 @@ module Transformer
 
     Orocos::RobyPlugin::Engine.register_instanciation_postprocessing do |engine, plan|
         if engine.transformer_enabled?
+            broadcasters = plan.find_tasks(Orocos::RobyPlugin::Transformer::Task).to_a
+            if broadcasters.empty?
+                task = engine.add_instance(Orocos::RobyPlugin::Transformer::Task)
+                plan.add_permanent(task)
+            end
+
             # Transfer the frame mapping information from the instance specification
             # objects to the selected_frames hashes on the tasks
             tasks = plan.find_local_tasks(Orocos::RobyPlugin::Component).roots(Roby::TaskStructure::Hierarchy)
@@ -1380,9 +1419,23 @@ module Transformer
         if engine.transformer_enabled?
             FramePropagation.compute_frames(plan)
 
+            transformer_tasks = plan.find_local_tasks(Orocos::RobyPlugin::TaskContext).
+                find_all { |task| task.model.transformer }
+
             # Now find out the frame producers that each task needs, and add them to
             # the graph
-            add_needed_producers(engine, plan)
+            add_needed_producers(engine, transformer_tasks)
+        end
+    end
+
+    Orocos::RobyPlugin::Engine.register_deployment_postprocessing do |engine, plan|
+        if engine.transformer_enabled?
+            transformer_tasks = plan.find_local_tasks(Orocos::RobyPlugin::TaskContext).
+                find_all { |task| task.model.transformer }
+
+            # And update the configuration state
+            update_configuration_state(engine.transformer_configuration_state[1], transformer_tasks)
+            engine.transformer_configuration_state[0] = Time.now
         end
     end
 end

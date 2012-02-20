@@ -11,8 +11,11 @@ module Transformer
     # Transformer setup for ruby scripts
     class RuntimeSetup
         attr_reader :manager
-        attr_reader :broadcaster
         attr_reader :configuration_state
+
+        def broadcaster
+            @broadcaster || Transformer.broadcaster
+        end
 
         def initialize
             Orocos.load_typekit('transformer')
@@ -138,7 +141,28 @@ module Transformer
             end
         end
 
-        def publish(*tasks)
+        def reset_configuration_state
+            configuration_state.port_transformation_associations.clear
+            configuration_state.port_frame_associations.clear
+            configuration_state.static_transformations.clear
+        end
+
+        def update_static_state
+            configuration_state.static_transformations =
+                manager.conf.
+                    enum_for(:each_static_transform).map do |static|
+                        rbs = Types::Base::Samples::RigidBodyState.invalid
+                        rbs.sourceFrame = static.from
+                        rbs.targetFrame = static.to
+                        rbs.position = static.translation
+                        rbs.orientation = static.rotation
+                        rbs
+                    end
+        end
+
+        def update_configuration_state(*tasks)
+            update_static_state
+
             # NOTE: the port-transform associations that are needed to connect
             # to the producers have already been filled by #setup_task. Do the
             # rest.
@@ -167,16 +191,11 @@ module Transformer
                 end
             end
 
-            configuration_state.static_transformations =
-                manager.conf.
-                    enum_for(:each_static_transform).map do |static|
-                        rbs = Types::Base::Samples::RigidBodyState.invalid
-                        rbs.sourceFrame = static.from
-                        rbs.targetFrame = static.to
-                        rbs.position = static.translation
-                        rbs.orientation = static.rotation
-                        rbs
-                    end
+        end
+
+        def publish(*tasks)
+            reset_configuration_state
+            update_configuration_state(*tasks)
 
             # Make sure the component is running
             if !broadcaster.running?
