@@ -1310,20 +1310,7 @@ module Transformer
     module EngineExtension
         attr_predicate :transformer_enabled?, true
 
-        # Module used to hook the Roby find-path mechanisms into the
-        # transformer's loading mechanisms
-        module LoadMechanismOverride
-            def load(*conf)
-                args = conf + [:order => :specific_first]
-                file = Roby.app.find_file(*args)
-                if !file
-                    raise ArgumentError, "cannot find #{conf.join("/")} in the Roby application path"
-                end
-                super(file)
-            end
-        end
-
-        Orocos.transformer.manager.conf.extend LoadMechanismOverride
+        Transformer.use_bundle_loader
 
         attribute(:transformer_configuration_state) do
             [Time.now, Types::Transformer::ConfigurationState.new]

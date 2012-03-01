@@ -8,6 +8,23 @@ module Transformer
         attr_accessor :frame
     end
 
+    # Module used to hook the Roby find-path mechanisms into the
+    # transformer's loading mechanisms
+    module BundleLoadMechanismOverride
+        def load(*conf)
+            args = conf + [:order => :specific_first]
+            file = Roby.app.find_file(*args)
+            if !file
+                raise ArgumentError, "cannot find #{conf.join("/")} in the Roby application path"
+            end
+            super(file)
+        end
+    end
+
+    def self.use_bundle_loader
+        Orocos.transformer.manager.conf.extend BundleLoadMechanismOverride
+    end
+
     # Transformer setup for ruby scripts
     class RuntimeSetup
         attr_reader :manager
