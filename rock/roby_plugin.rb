@@ -492,9 +492,13 @@ module Transformer
         # Given a port associated with a transformer transformation, assign the
         # given frames to this local transformation
         def select_port_for_transform(port, from, to)
-            task_port_name = model.port_mappings_for_task[port.name]
+            if port.respond_to?(:name)
+                port = port.name
+            end
+
+            task_port_name = model.port_mappings_for_task[port]
             if !task_port_name
-                raise ArgumentError, "#{port.name} is not a known output port of #{self}"
+                raise ArgumentError, "#{port} is not a known output port of #{self}"
             end
 
             task_port = task.model.find_output_port(task_port_name)
