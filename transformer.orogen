@@ -25,3 +25,4 @@ task_context "Task" do
     output_port "configuration_state", "transformer/ConfigurationState"
 end
 
+simple_deployment 'transformer_broadcaster', 'transformer::Task'
