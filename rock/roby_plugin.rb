@@ -554,18 +554,21 @@ module Transformer
         # Given a port associated with a transformer transformation, assign the
         # given frames to this local transformation
         def select_port_for_transform(port, from, to)
-            if model.find_output_port(port.name) != port
-                raise ArgumentError, "#{port.name} is not an output port of #{self}"
+            if port.respond_to?(:name)
+                if model.find_output_port(port.name) != port
+                    raise ArgumentError, "#{port.name} is not an output port of #{self}"
+                end
+                port = port.name
             end
 
             if !(tr = model.transformer)
                 tr = model.transformer do
-                    transform_output port.name, from => to
+                    transform_output port, from => to
                 end
             end
 
             if !(transform = tr.find_transform_of_port(port))
-                transform = tr.transform_output(port.name, from => to)
+                transform = tr.transform_output(port, from => to)
             end
             select_frames(transform.from => from, transform.to => to)
         end
