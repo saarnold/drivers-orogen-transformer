@@ -906,9 +906,11 @@ module Transformer
                             from, to = selected_transform.from, selected_transform.to
                             if tr && (transform = tr.find_transform_of_port(out_port))
                                 if from
+                                    FramePropagation.debug { "selecting #{from} on #{task} for #{transform.from} from the source frame of device #{dev.name}" }
                                     task.select_frame(transform.from, from)
                                 end
                                 if to
+                                    FramePropagation.debug { "selecting #{to} on #{task} for #{transform.to} from the target frame of device #{dev.name}" }
                                     task.select_frame(transform.to, to)
                                 end
                             else
@@ -918,6 +920,7 @@ module Transformer
                             end
                         elsif selected_frame
                             if tr && (frame_name = tr.find_frame_of_port(out_port))
+                                FramePropagation.debug { "selecting #{selected_frame} on #{task} for #{frame_name} from the frame of device #{dev.name}" }
                                 task.select_frame(frame_name, selected_frame)
                             else
                                 add_port_info(task, out_port.name,
@@ -1050,6 +1053,7 @@ module Transformer
                     end
 
                     begin
+                        debug { "selecting #{info.selected_frame} on #{task} for #{frame} through port #{port.name}" }
                         task.select_frame(frame, info.selected_frame)
                     rescue InvalidFrameSelection => e
                         refine_invalid_frame_selection(e)
@@ -1063,9 +1067,11 @@ module Transformer
 
                 begin
                     if info.from
+                        debug { "selecting #{info.from} on #{task} for #{transform.from} through the source frame of port #{port.name}" }
                         task.select_frame(transform.from, info.from)
                     end
                     if info.to
+                        debug { "selecting #{info.to} on #{task} for #{transform.to} through the source frame of port #{port.name}" }
                         task.select_frame(transform.to, info.to)
                     end
                 rescue InvalidFrameSelection => e
@@ -1107,6 +1113,7 @@ module Transformer
             # Do selection for the frames that can't be configured anyways
             if task.model.respond_to?(:transformer) && (tr = task.model.transformer)
                 tr.each_statically_mapped_frame do |frame_name|
+                    debug { "selected frame #{frame_name} on #{task} for #{frame_name}: static frame" }
                     task.select_frames(frame_name => frame_name)
                 end
             end
@@ -1158,6 +1165,7 @@ module Transformer
             end
 
             if new_selection.empty?
+                debug { "selecting frames #{current_selection} propagated from its parents" }
                 task.select_frames(current_selection)
             else
                 debug { "adding frame selection from #{task}: #{new_selection}" }
