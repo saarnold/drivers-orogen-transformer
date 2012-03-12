@@ -681,7 +681,10 @@ module TransformerPlugin
                 #
                 # Just yield if the frame is used as a transformation output
                 each_transform_output do |port, transform|
-                    yield(frame_name) if transform.from == frame_name || transform.to == frame_name
+                    if transform.from == frame_name || transform.to == frame_name
+                        yield(frame_name) 
+                        break
+                    end
                 end
             end
         end
