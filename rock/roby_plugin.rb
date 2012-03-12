@@ -1114,7 +1114,7 @@ module Transformer
             if task.model.respond_to?(:transformer) && (tr = task.model.transformer)
                 tr.each_statically_mapped_frame do |frame_name|
                     debug { "selected frame #{frame_name} on #{task} for #{frame_name}: static frame" }
-                    task.select_frames(frame_name => frame_name)
+                    task.select_frame(frame_name, frame_name)
                 end
             end
 
