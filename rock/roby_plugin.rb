@@ -1388,6 +1388,8 @@ module Transformer
 
     Orocos::RobyPlugin::Engine.register_instanciation_postprocessing do |engine, plan|
         if engine.transformer_enabled?
+            engine.model.using_task_library('transformer')
+            engine.use_deployment('transformer_broadcaster')
             broadcasters = plan.find_tasks(Orocos::RobyPlugin::Transformer::Task).to_a
             if broadcasters.empty?
                 task = engine.add_instance(Orocos::RobyPlugin::Transformer::Task)
