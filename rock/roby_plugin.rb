@@ -409,7 +409,7 @@ module Transformer
             if type_candidates.size == 1
                 return type_candidates.first
             elsif type_candidates.size > 1
-                raise TransformationPortAmbiguity.new(self, from, to, candidates)
+                raise TransformationPortAmbiguity.new(self, from, to, type_candidates)
             end
 
             return nil
