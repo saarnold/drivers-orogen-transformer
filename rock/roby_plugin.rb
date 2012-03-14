@@ -160,6 +160,7 @@ module Transformer
                 pp.breakable
                 task.pretty_print(pp)
             end
+            pp.breakable
             pp.text "Candidates:"
             pp.nest(2) do
                 pp.breakable
