@@ -392,7 +392,6 @@ module TransformerPlugin
             if frame_names.empty?
                 @configurable_frames
             else
-                puts "#{task.name} configurable_frames(#{frame_names.join(", ")})"
                 frames(*frame_names)
                 frame_names.each do |name|
                     name = name.to_s
