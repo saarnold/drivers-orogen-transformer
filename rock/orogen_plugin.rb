@@ -831,6 +831,7 @@ class Orocos::Spec::TaskContext
 
         config.update_spec
         register_extension(config)
+        config
     end
 end
 
