@@ -1327,8 +1327,6 @@ module Transformer
     module EngineExtension
         attr_predicate :transformer_enabled?, true
 
-        Transformer.use_bundle_loader
-
         attribute(:transformer_configuration_state) do
             [Time.now, Types::Transformer::ConfigurationState.new]
         end
@@ -1379,6 +1377,7 @@ module Transformer
         # The configuration is overlaid over the current configuration. Use
         # #clean_transformer_conf to start it from scratch
         def load_transformer_conf(*path)
+            Transformer.use_bundle_loader
             Orocos.transformer.manager.conf.load_transformer_conf(*path)
         end
 
