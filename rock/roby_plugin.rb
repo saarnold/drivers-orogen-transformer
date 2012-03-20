@@ -416,6 +416,19 @@ module Transformer
             return nil
         end
 
+        def each_transform_output
+            model.each_output_port do |port|
+                next if !Transformer.transform_port?(port)
+
+                self.each_concrete_input_connection(port) do |source_task, source_port, sink_port, policy|
+                    return if !(tr = source_task.model.transformer)
+                    if associated_transform = tr.find_transform_of_port(source_port)
+                        yield(sink_port, associated_transform.from, associated_transform.to)
+                    end
+                end
+            end
+        end
+
         def select_port_for_transform(port, from, to)
             port = if port.respond_to?(:to_str) then port
                    else port.name
