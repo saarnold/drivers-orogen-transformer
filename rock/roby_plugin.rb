@@ -1,4 +1,5 @@
 require 'transformer'
+require 'transformer/runtime'
 
 module Transformer
     # Exception raised when a frame is being selected with #selected_frame, but
