@@ -780,8 +780,8 @@ module Transformer
                     raise ArgumentError, "cannot merge a frame annotation with a transform annotation. You are probably connecting two ports, one declared as a transform input or output and one only associated with a frame"
                 end
 
-                if ann.name != name
-                    raise FrameSelectionConflict.new(task, frame_name, selected_frame, ann.name),
+                if ann.selected_frame != selected_frame
+                    raise FrameSelectionConflict.new(task, frame_name, selected_frame, ann.selected_frame),
                         "invalid network: frame #{frame_name} in #{task} would need to select both #{ann.selected_frame} and #{selected_frame}"
                 end
                 false
