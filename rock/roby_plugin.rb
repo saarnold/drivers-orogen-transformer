@@ -1319,6 +1319,8 @@ module Transformer
                 end
             end
             tr.each_transform_port do |port, transform|
+		next if port.kind_of?(Orocos::Spec::InputPort)
+
                 from = task.selected_frames[transform.from]
                 to   = task.selected_frames[transform.to]
                 if from && to
