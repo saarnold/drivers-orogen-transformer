@@ -1416,8 +1416,7 @@ module Transformer
             engine.use_deployment('transformer_broadcaster')
             broadcasters = plan.find_tasks(Orocos::RobyPlugin::Transformer::Task).to_a
             if broadcasters.empty?
-                task = engine.add_instance(Orocos::RobyPlugin::Transformer::Task)
-                plan.add_permanent(task)
+                task = engine.add_instance(Orocos::RobyPlugin::Transformer::Task, :mission => true)
             end
 
             # Transfer the frame mapping information from the instance specification
