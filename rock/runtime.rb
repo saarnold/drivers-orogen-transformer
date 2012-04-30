@@ -125,7 +125,11 @@ module Transformer
                 Transformer.debug do
                     Transformer.debug "looking for chain for #{from} => #{to} in #{task.name}"
                 end
-                chain = manager.transformation_chain(from, to)
+                chain =
+		    begin manager.transformation_chain(from, to)
+		    rescue Transformer::TransformationNotFound => e
+			raise e, "#{e.message}, required by #{task.name} for #{trsf.from} => #{trsf.to}"
+		    end
                 Transformer.log_pp(:debug, chain)
 
                 static, dynamic = chain.partition
