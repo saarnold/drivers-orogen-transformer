@@ -253,7 +253,7 @@ end
 
 module Orocos
     def self.transformer
-        @transformer ||= Transformer::RuntimeSetup.new
+        @transformer ||= ::Transformer::RuntimeSetup.new
     end
 
     class InputPort
