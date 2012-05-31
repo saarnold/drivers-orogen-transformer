@@ -9,4 +9,5 @@
   <logo>http://</logo>
   <depend package="drivers/orogen/aggregator" />
   <depend package="drivers/transformer" />
+  <tags>stable</tags>
 </package>
