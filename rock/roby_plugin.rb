@@ -849,7 +849,7 @@ module Transformer
 
         def self.compute_frames(plan)
             algorithm = FramePropagation.new
-            tasks = plan.find_tasks(Orocos::RobyPlugin::TaskContext).to_value_set
+            tasks = plan.find_local_tasks(Orocos::RobyPlugin::TaskContext).to_value_set
             algorithm.propagate(tasks)
         end
 
@@ -1414,7 +1414,7 @@ module Transformer
         if engine.transformer_enabled?
             engine.model.using_task_library('transformer')
             engine.use_deployment('transformer_broadcaster')
-            broadcasters = plan.find_tasks(Orocos::RobyPlugin::Transformer::Task).to_a
+            broadcasters = plan.find_local_tasks(Orocos::RobyPlugin::Transformer::Task).to_a
             if broadcasters.empty?
                 task = engine.add_instance(Orocos::RobyPlugin::Transformer::Task, :mission => true)
             end
