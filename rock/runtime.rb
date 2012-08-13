@@ -148,6 +148,13 @@ module Transformer
                 end
             end
 
+            # setting properties of a running thread is not thread safe
+            # furthermore most of the tasks are not reading the properties after they are configured
+            if task.ready? && !needed_static_transforms.empty?
+                raise RuntimeError, "Cannot configure static transformations for task #{task.name}. Task is already configured. " +
+                                    "Do not call #{task.name}.configure before the transformer has been initialized."
+            end
+
             task.static_transformations = needed_static_transforms.each_value.map do |static|
                 rbs = Types::Base::Samples::RigidBodyState.invalid
                 rbs.sourceFrame = static.from
