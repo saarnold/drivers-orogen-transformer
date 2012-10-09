@@ -438,6 +438,7 @@ module Transformer
                 source_task.select_port_for_transform(source_port, from, to)
                 return
             end
+	    nil
         end
 
         def find_transform_of_port(port)
@@ -448,6 +449,7 @@ module Transformer
             self.each_concrete_input_connection(port) do |source_task, source_port, sink_port, policy|
                 return source_task.find_transform_of_port(source_port)
             end
+	    nil
         end
     end
 
