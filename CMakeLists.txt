@@ -12,6 +12,7 @@ install(FILES ${PROJECT_SOURCE_DIR}/rock/roby_plugin.rb
         DESTINATION ${CMAKE_INSTALL_PREFIX}/share/orogen/plugins/roby
         RENAME transformer_plugin.rb)
 
+list(APPEND CMAKE_MODULE_PATH $ENV{ROCK_CMAKE_MACROS})
 include($ENV{ROCK_CMAKE_MACROS}/RockRuby.cmake)
 # Install a transformer/runtime file, which will be loaded by orocos.rb whenever
 # it loads an oroGen model that has a transformer extension
