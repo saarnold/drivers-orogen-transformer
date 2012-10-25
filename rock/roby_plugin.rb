@@ -390,7 +390,7 @@ module Transformer
             model.each_output_port do |port|
                 next if !Transformer.transform_port?(port)
 
-                if transform = find_transform_of_port(port.name)
+                if transform = find_transform_of_port(port)
                     if transform.from == from && transform.to == to
                         return port
                     elsif ((transform.from == from || !transform.from) && (transform.to == to || !transform.to))

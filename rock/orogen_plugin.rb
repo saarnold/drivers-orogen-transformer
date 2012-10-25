@@ -510,7 +510,9 @@ module TransformerPlugin
         # If +port+ has a transformation associated with #transform_output or
         # #transform_input, returns it. Otherwise, returns nil
         def find_transform_of_port(port)
-            if port.respond_to?(:to_str)
+            if port.respond_to?(:name)
+                port = task.find_port(port.name)
+            else
                 port = task.find_port(port)
             end
 
