@@ -11,9 +11,6 @@ install(FILES ${PROJECT_SOURCE_DIR}/rock/orogen_plugin.rb
 install(FILES ${PROJECT_SOURCE_DIR}/rock/roby_plugin.rb
         DESTINATION ${CMAKE_INSTALL_PREFIX}/share/orogen/plugins/roby
         RENAME transformer_plugin.rb)
-install(FILES ${PROJECT_SOURCE_DIR}/rock/syskit_plugin.rb
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/share/orogen/plugins/syskit
-        RENAME transformer_plugin.rb)
 
 find_package(Rock)
 include(RockRuby)
