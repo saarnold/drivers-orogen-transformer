@@ -293,6 +293,13 @@ module TransformerPlugin
             def configurable
                 ext.configurable_frames(transform.from, transform.to)
             end
+
+            def method_missing(m, *args, &block)
+                if transform.respond_to?(m)
+                    transform.send(m, *args, &block)
+                else super
+                end
+            end
         end
 
         def name; "transformer" end
