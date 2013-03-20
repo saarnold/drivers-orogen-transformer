@@ -235,7 +235,7 @@ module Transformer
         def start_broadcaster(name = Transformer.broadcaster_name, options = Hash.new)
             options = options.merge('transformer::Task' => name)
             Orocos::Process.run(options) do
-                @broadcaster = Orocos::TaskContext.get(name)
+                @broadcaster = Orocos.name_service.get(name)
                 yield
             end
         end
