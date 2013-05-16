@@ -6,7 +6,8 @@ module TransformerPlugin
         # Code generation to generate code for the first task class that has a
         # transformer in the task hierarchy
         def generate_root_class(task, config)
-	    task.add_base_member("transformer", "_#{config.name}", "transformer::Transformer")
+	    task.add_base_member("transformer", "_#{config.name}", "transformer::Transformer").
+		initializer( "_#{config.name}(#{config.priority})" )
 	    task.add_base_member("lastStatusTime", "_lastStatusTime", "base::Time")
 
 	    task.in_base_hook("configure", "
@@ -336,6 +337,8 @@ module TransformerPlugin
         # [Set<String>] a set of frames for which a configuration property
         # should be added to the component
         attr_reader :configurable_frames
+	# [Integer] the priority value which is given to dynamic transformation streams
+	attr_reader :priority
 
 	def initialize(name, task)
             super(name)
@@ -351,7 +354,13 @@ module TransformerPlugin
             @transform_inputs  = Hash.new
 
             @configurable_frames = Set.new
-            @priority = 0
+            @priority_counter = 0
+	    @priority = -10
+	end
+
+	# set the priority of the dynamic transformation streams
+	def transform_priority( priority )
+	    @priority = priority
 	end
 	
         # Requires the transformer to align the given input port on the
@@ -363,7 +372,7 @@ module TransformerPlugin
             if priority
                 streams << StreamDescription.new(name, period, priority)
             else
-                streams << StreamDescription.new(name, period, (@priority += 1))
+                streams << StreamDescription.new(name, period, (@priority_counter += 1))
             end
 	end
 
