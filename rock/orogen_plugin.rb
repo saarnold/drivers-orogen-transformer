@@ -8,7 +8,7 @@ module TransformerPlugin
         def generate_root_class(task, config)
 	    task.add_base_member("transformer", "_#{config.name}", "transformer::Transformer").
 		initializer( "_#{config.name}(#{config.priority})" )
-	    task.add_base_member("lastStatusTime", "_lastStatusTime", "base::Time")
+	    task.add_base_member("nextStatusTime", "_nextStatusTime", "base::Time")
 
 	    task.in_base_hook("configure", "
     _#{config.name}.clear();
@@ -32,17 +32,13 @@ module TransformerPlugin
 	_#{config.name}.pushDynamicTransformation(dynamicTransform);
     }
 
+    const base::Time statusPeriod( base::Time::fromSeconds( _#{config.name}_status_period.value() ) );
     while(_#{config.name}.step()) 
     {
-	;
-    }")
-
-	    task.in_base_hook('update', "
-    {
 	const base::Time curTime(base::Time::now());
-	if(curTime - _lastStatusTime > base::Time::fromSeconds( _#{config.name}_status_period.value() ))
+	if( curTime > _nextStatusTime )
 	{
-	    _lastStatusTime = curTime;
+	    _nextStatusTime = curTime + statusPeriod;
 	    _#{config.name}_stream_aligner_status.write(_#{config.name}.getStatus());
             updateTransformerStatus();
 	}
