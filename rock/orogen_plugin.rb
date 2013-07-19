@@ -33,7 +33,7 @@ module TransformerPlugin
     }
 
     const base::Time statusPeriod( base::Time::fromSeconds( _#{config.name}_status_period.value() ) );
-    while(_#{config.name}.step()) 
+    do
     {
 	const base::Time curTime(base::Time::now());
 	if( curTime > _nextStatusTime )
@@ -42,7 +42,8 @@ module TransformerPlugin
 	    _#{config.name}_stream_aligner_status.write(_#{config.name}.getStatus());
             updateTransformerStatus();
 	}
-    }")
+    }
+    while(_#{config.name}.step());")
 
 	    #unregister in cleanup
 	    task.in_base_hook("cleanup", "
