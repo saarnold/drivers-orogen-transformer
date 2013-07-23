@@ -455,6 +455,9 @@ module TransformerPlugin
 
         # Enumerates the (port, transform) pairs that describe the
         # transformations this component emits
+        #
+        # @yieldparam [Orocos::Spec::Port] port
+        # @yieldparam [TransformationPort] transformation
         def each_transform_output(&block)
             transform_outputs.each(&block)
             supercall(nil, :each_transform_output, &block)
@@ -462,12 +465,18 @@ module TransformerPlugin
 
         # Enumerates the (port, transform) pairs that describe the
         # transformations this component receives
+        #
+        # @yieldparam [Orocos::Spec::Port] port
+        # @yieldparam [TransformationPort] transformation
         def each_transform_input(&block)
             transform_inputs.each(&block)
             supercall(nil, :each_transform_input, &block)
         end
 
         # Enumerates all input and output transform ports
+        #
+        # @yieldparam [Orocos::Spec::Port] port
+        # @yieldparam [TransformationPort] transformation
         def each_transform_port(&block)
             if !block
                 return enum_for(:each_transform_port)
@@ -545,8 +554,11 @@ module TransformerPlugin
             end
         end
 
-        # Enumerates the (port, frame_name) pairs for all ports that have a
+        # Enumerates the (port_name, frame_name) pairs for all ports that have a
         # frame associated
+        #
+        # @yieldparam [Orocos::Spec::Port] port
+        # @yieldparam [String] frame_name
         def each_annotated_port(&block)
             if !block_given?
                 return enum_for(:each_annotated_port)
