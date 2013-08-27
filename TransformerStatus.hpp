@@ -2,6 +2,7 @@
 #define TRANSFORMER_STATUS_HPP
 
 #include <transformer/TransformationStatus.hpp>
+#include <vector>
 
 namespace transformer
 {
