@@ -540,7 +540,7 @@ module TransformerPlugin
             if result = (transform_inputs[port] || transform_outputs[port])
                 result
             else
-                supercall(nil, :find_transform_of_port)
+                supercall(nil, :find_transform_of_port, port)
             end
         end
 
