@@ -42,7 +42,8 @@ module TransformerPlugin
 	    _#{config.name}_stream_aligner_status.write(_#{config.name}.getStatus());
             updateTransformerStatus();
 	}
-    } while(_#{config.name}.step());")
+    }
+    while(_#{config.name}.step());")
 
 	    #unregister in cleanup
 	    task.in_base_hook("cleanup", "
