@@ -233,7 +233,6 @@ module Transformer
         end
 
         def start_broadcaster(name = Transformer.broadcaster_name, options = Hash.new)
-            options = options.merge('transformer::Task' => name)
             begin
             	@broadcaster = Orocos.name_service.get(name)
             rescue Orocos::NotFound => e
