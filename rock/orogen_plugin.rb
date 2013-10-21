@@ -118,7 +118,7 @@ module TransformerPlugin
 		task.in_base_hook("configure", "
     {
     const double #{stream.name}Period = _#{stream.name}_period.value();
-    #{idx_name(stream)} = _#{config.name}.registerDataStream< #{stream_data_type}>(
+    #{idx_name(stream)} = _#{config.name}.registerDataStream< #{stream_data_type} >(
 		    base::Time::fromSeconds(#{stream.name}Period), boost::bind( &#{task.class_name}Base::#{callback_name(stream)}, this, _1, _2), #{stream.priority}, \"#{stream.name}\");
     }")
 
