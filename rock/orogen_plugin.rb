@@ -717,6 +717,7 @@ module TransformerPlugin
                 task.property('static_transformations', 'std::vector</base/samples/RigidBodyState>').
                     doc "list of static transformations"
                 task.input_port('dynamic_transformations', '/base/samples/RigidBodyState').
+                    multiplexes.
                     needs_reliable_connection
             end
                 
