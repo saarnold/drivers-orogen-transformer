@@ -51,6 +51,7 @@ module TransformerPlugin
         end
 
 	def generate(task, config)
+            task.project.using_library('transformer', :typekit => false)
             port_listener_ext = task.extension("port_listener", false)
 
             if !(tr = config.task.superclass.find_extension('transformer')) || !tr.needs_transformer?
@@ -693,7 +694,6 @@ module TransformerPlugin
             # Don't add the general stuff if it has already been added
             if !task.has_property?("#{name}_max_latency")
                 task.project.import_types_from "base"
-                task.project.using_library('transformer', :typekit => false)
                 task.project.import_types_from "transformer"
 
                 task.property("#{name}_max_latency", 'double', max_latency).
