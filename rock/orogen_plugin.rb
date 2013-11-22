@@ -696,7 +696,7 @@ module TransformerPlugin
                 task.project.import_types_from "base"
                 task.project.import_types_from "transformer"
 
-                task.property("#{name}_max_latency", 'double', max_latency).
+                task.property("#{name}_max_latency", '/double', max_latency).
                     doc "Maximum time in seconds the transformer will wait until it starts dropping samples"
                 Orocos::Spec.info("transformer: adding property #{name}_max_latency to #{task.name}")
 
@@ -706,15 +706,15 @@ module TransformerPlugin
                 task.output_port("#{name}_stream_aligner_status", '/aggregator/StreamAlignerStatus').
 		    doc "Status information on the stream aligner that is underlying the transformer."
                 Orocos::Spec.info("transformer: adding port #{name}_status to #{task.name}")
-                task.output_port("#{name}_status", 'transformer/TransformerStatus').
+                task.output_port("#{name}_status", '/transformer/TransformerStatus').
                     doc "Status information on the transformer internal state"
                 Orocos::Spec.info("transformer: adding output port #{name}_status to #{task.name}")
-		task.property("#{name}_status_period", 'double', 1.0).
+		task.property("#{name}_status_period", '/double', 1.0).
 		    doc "Minimum system time in seconds between two updates of the status ports"
 		Orocos::Spec.info("Adding property #{name}_status_period to #{task.name}")
                 
                 # Create ports for transformations
-                task.property('static_transformations', 'std::vector</base/samples/RigidBodyState>').
+                task.property('static_transformations', '/std/vector</base/samples/RigidBodyState>').
                     doc "list of static transformations"
                 task.input_port('dynamic_transformations', '/base/samples/RigidBodyState').
                     multiplexes.
@@ -725,7 +725,7 @@ module TransformerPlugin
             streams.each do |stream|
                 property_name = "#{stream.name}_period"
                 if !task.find_property(property_name)
-                    task.property(property_name,   'double', stream.period).
+                    task.property(property_name,   '/double', stream.period).
                         doc "Time in s between #{stream.name} readings"
                     Orocos::Spec.info("transformer: adding property #{property_name} to #{task.name}")
                 end
