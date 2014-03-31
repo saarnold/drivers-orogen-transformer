@@ -41,10 +41,10 @@ void Task::setConfiguration(::transformer::ConfigurationState const& configurati
 //         return false;
 //     return true;
 // }
-// void Task::updateHook()
-// {
-//     TaskBase::updateHook();
-// }
+ void Task::updateHook()
+{
+     TaskBase::updateHook();
+}
 // void Task::errorHook()
 // {
 //     TaskBase::errorHook();

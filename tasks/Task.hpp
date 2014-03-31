@@ -25,7 +25,6 @@ namespace transformer {
     {
 	friend class TaskBase;
     protected:
-
         /* Handler for the setConfiguration operation
          */
         virtual void setConfiguration(::transformer::ConfigurationState const & configuration);
@@ -85,7 +84,7 @@ namespace transformer {
          * component is stopped and recover() needs to be called before starting
          * it again. Finally, FatalError cannot be recovered.
          */
-        // void updateHook();
+        void updateHook();
 
         /** This hook is called by Orocos when the component is in the
          * RunTimeError state, at each activity step. See the discussion in

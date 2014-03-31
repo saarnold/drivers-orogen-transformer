@@ -1,12 +1,17 @@
 name "transformer"
 
 import_types_from "base"
+import_types_from "aggregator"
 import_types_from "BroadcastTypes.hpp"
 import_types_from "TransformerStatus.hpp"
+import_types_from "TransformDefinition.hpp"
+using_library "transformer"
+
 typekit do
     # This one is actually for the transformer plugin, but we want to avoid
     # adding a new package just for that
     export_types '/std/vector</base/samples/RigidBodyState>'
+    export_types '/transformer/TransformationStatus'
     export_types '/transformer/TransformerStatus'
 end	
 
@@ -25,4 +30,38 @@ task_context "Task" do
     output_port "configuration_state", "transformer/ConfigurationState"
 end
 
+task_context "TransformationMonitor" do
+    needs_configuration
+    property "transforms", "std/vector<transformer/TransformDefinition>"
+
+    #usually done by orogen
+    property "transformer_max_latency", "double", 0.5
+    property "static_transformations", '/std/vector</base/samples/RigidBodyState>'
+    property "transformer_status_period", "double", 0.5
+    input_port "dynamic_transformations", "/base/samples/RigidBodyState"
+    output_port "transformer_stream_aligner_status", "aggregator/StreamAlignerStatus"
+    output_port "transformer_status", "transformer/TransformerStatus"
+    
+    dynamic_output_port /.*/, "/base/samples/RigidBodyState"
+
+    periodic 0.1
+    
+    operation('register_transform').
+        returns('/std/string').
+        argument('transform_definition', 'transformer/TransformDefinition')
+    operation('deregister_transform').
+        argument('transform_definition', 'transformer/TransformDefinition')
+    
+    #I get compile errors, when I let oroGen handle the inclusion of transformer
+    #into the component. Therefore I do it manually.
+    #transformer do
+    #    transform 'from', 'to'
+    #    max_latency '0.5'
+    #end
+end
+
 simple_deployment 'transformer_broadcaster', 'transformer::Task'
+
+deployment 'transformation_monitor' do
+    task 'transformation_monitor', 'transformer::TransformationMonitor'
+end

@@ -1,0 +1,89 @@
+#! /usr/bin/env ruby
+require 'orocos'
+require 'orocos/async'
+require 'vizkit'
+require 'pry'
+
+def is_running?(task_name)
+    begin
+        Orocos.name_service.get task_name
+        return true
+    rescue
+        return false
+    end
+end
+
+def get_port(task_name, port_name)
+    task = Orocos.name_service.get task_name
+    port = task.port(port_name)
+    port
+end
+
+$scanned_tasks = []
+$producers = []
+$producer_proxys = []
+$transformation_monitor = nil
+
+Orocos.initialize
+
+if is_running? 'transformation_monitor'
+    warn 'transformation_monitor was already running'
+    exit(0)
+end
+
+Orocos.run "transformation_monitor" do
+    def handle_port_transformation_association(pt)
+        pt_id = "#{pt.task}.#{pt.port}"
+        if not $producers.include? pt_id
+            $producer_proxys << Orocos::name_service.get(pt.task)
+            $producers << pt_id
+            puts "Connection established: #{pt_id}"
+            $producer_proxys[-1].port(pt.port).connect_to $transformation_monitor.dynamic_transformations
+        end
+    end
+    
+    def handle_configuration_state(data)
+        data.port_transformation_associations.each do |pt|
+            handle_port_transformation_association(pt)
+        end
+    end
+
+    broadcaster = Orocos::Async.proxy("transformer_broadcaster")
+    broadcaster_port = broadcaster.port('configuration_state')
+    
+    $transformation_monitor = Orocos.name_service.get("transformation_monitor")
+    $transformation_monitor.configure
+    $transformation_monitor.start
+    
+    if not broadcaster.reachable?
+        warn "transformer_broadcaster not reachable"
+    end
+
+    broadcaster_port.on_data do |sample|
+        puts "received transformer_broadcaster update"
+        handle_configuration_state sample
+    end
+
+    Thread.new do
+        while true
+            Orocos.name_service.each_task do |tn|
+                if $scanned_tasks.include? tn.name
+                    next
+                end
+                tn.each_output_port do |p|
+                     if p.type == Types::Base::Samples::RigidBodyState 
+                        pt = Types::Transformer::PortTransformationAssociation.new
+                        pt.task = tn.name
+                        pt.port = p.name                    
+                        handle_port_transformation_association(pt)
+                     end
+                end
+                $scanned_tasks << tn
+            end
+            sleep(5)
+        end
+    end
+
+    Vizkit.exec
+end
+

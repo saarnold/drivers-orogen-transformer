@@ -18,6 +18,7 @@ include(RockRuby)
 # it loads an oroGen model that has a transformer extension
 rock_ruby_library(transformer rock/runtime.rb)
 
-# FIND_PACKAGE(KDL)
-# FIND_PACKAGE(OCL)
+install(PROGRAMS bin/start_transformation_monitor bin/rock-print_transform
+    DESTINATION bin)
+
 

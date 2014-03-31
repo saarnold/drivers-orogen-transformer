@@ -1,0 +1,117 @@
+#! /usr/bin/env ruby
+
+require 'orocos'
+require 'optparse'
+require 'orocos/async'
+require 'pry'
+Orocos.initialize
+
+$with_position=true
+$with_orientation=true
+$with_velocity=true
+$with_angular_velocity=true
+$thread=nil
+$monitor=nil
+$transform_def=nil
+
+def is_running?(task_name)
+    begin
+        a=Orocos.name_service.get task_name
+        return true
+    rescue
+        return false
+    end
+end
+
+def print_transform(sample)
+    puts '---'
+    puts "#{sample.time.year}-#{sample.time.year}-#{sample.time.day} #{sample.time.hour}:#{sample.time.min}:#{sample.time.sec}.#{sample.time.nsec}"
+    if $with_position
+        puts "%-17s: %.5f, %.5f, %.5f" % ["position", sample.position.x, sample.position.y, sample.position.z]
+    end
+    if $with_orientation
+        puts "%-17s: %.5f, %.5f, %.5f, %.5f" % ["orientation", sample.orientation.x, sample.orientation.y, sample.orientation.z, sample.orientation.w]
+    end
+    if $with_velocity
+        puts "%-17s: %.5f, %.5f, %.5f" % ["velocity", sample.velocity.x, sample.velocity.y, sample.velocity.z]
+    end
+    if $with_angular_velocity
+        puts "%-17s: %.5f, %.5f, %.5f" % ["angular velocity", sample.angular_velocity.x, sample.angular_velocity.y, sample.angular_velocity.z]
+    end
+end
+
+def clean_up()
+    puts "Clean up"
+    $monitor.deregister_transform($transform_def)
+end
+
+
+#def transformation_monitor
+#    if not is_running? 'transformation_monitor'
+#        $thread = Thread.new do
+#            Kernel.system('start_transformation_monitor')
+#        end
+#    end
+#end
+
+
+rate=0.5
+options = OptionParser.new do |opt|
+    opt.banner = <<-EOD
+rock-print_transform [options] <source frame> <target frame>
+    EOD
+    opt.on '--rate=VALUE', "Update rate to output transform in seconds." do |val|
+        rate=Float(val)
+    end
+end
+
+args = options.parse(ARGV)
+source_frame = args.shift
+target_frame = args.shift
+
+#Retrieve task contexts
+#transformation_monitor()
+
+while true
+    begin
+        $monitor = Orocos.name_service.get 'transformation_monitor'
+        break
+    rescue
+        puts "Waiting until transformation_monitor is running"
+        sleep(0.5)
+    end
+end
+
+#service call to register transform
+$transform_def=Types::Transformer::TransformDefinition.new
+$transform_def.source_frame = source_frame
+$transform_def.target_frame = target_frame
+output_port_name = $monitor.register_transform($transform_def)
+puts "Transform is published on #{output_port_name}"
+output_port=nil
+#Get access to port
+while true
+    output_port = $monitor.ports.find do |p| p.name==output_port_name end
+    if output_port
+        break
+    else
+        sleep(0.1)
+    end
+end
+reader = output_port.reader
+
+#Echo periodically
+trap("SIGINT"){
+    clean_up
+    exit
+}
+
+while true
+    sample = reader.read_new
+    if sample
+        print_transform sample
+    end
+    sleep(rate)
+end
+
+
