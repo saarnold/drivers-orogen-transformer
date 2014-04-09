@@ -23,8 +23,12 @@ $scanned_tasks = []
 $producers = []
 $producer_proxys = []
 $transformation_monitor = nil
+$broadcaster = nil
+$broadcaster_port_r = nil
+$transformer_configuration_state = nil
 
 Orocos.initialize
+Orocos.load_typekit 'transformer'
 
 if is_running? 'transformation_monitor'
     warn 'transformation_monitor was already running'
@@ -47,42 +51,68 @@ Orocos.run "transformation_monitor" do
             handle_port_transformation_association(pt)
         end
     end
-
-    broadcaster = Orocos::Async.proxy("transformer_broadcaster")
-    broadcaster_port = broadcaster.port('configuration_state')
+    
+    if not is_running?("transformer_broadcaster")
+        puts "transformer_broadcaster is not running"
+    else
+        $broadcaster = Orocos::name_service.get("transformer_broadcaster")
+        $broadcaster_port_r = $broadcaster.port('configuration_state').reader
+        sleep(0.3)
+    end
     
     $transformation_monitor = Orocos.name_service.get("transformation_monitor")
+    $transformation_monitor.transformer_max_latency = 100
     $transformation_monitor.configure
     $transformation_monitor.start
     
-    if not broadcaster.reachable?
-        warn "transformer_broadcaster not reachable"
-    end
-
-    broadcaster_port.on_data do |sample|
-        puts "received transformer_broadcaster update"
-        handle_configuration_state sample
-    end
-
-    Thread.new do
+    #t=Thread.new do
         while true
+            #See if there is new data on transformer_broadcaster
+            sample = $broadcaster_port_r.read_new
+            if sample
+                puts "Received transformer_broadcaster update"
+                handle_configuration_state sample
+                $transformer_configuration_state = sample
+            end
+        
+            #Scan for new task contexts
             Orocos.name_service.each_task do |tn|
+                if tn.name == "/transformation_monitor"
+                    puts "Skipping transformation_monitor"
+                    next
+                end
                 if $scanned_tasks.include? tn.name
                     next
                 end
                 tn.each_output_port do |p|
-                     if p.type == Types::Base::Samples::RigidBodyState 
+                    if p.type == Types::Base::Samples::RigidBodyState 
                         pt = Types::Transformer::PortTransformationAssociation.new
                         pt.task = tn.name
-                        pt.port = p.name                    
-                        handle_port_transformation_association(pt)
-                     end
+                        pt.port = p.name
+                        
+                        #Only continue if there is actually data on the port           
+                        task = Orocos.name_service.get pt.task
+                        port_r = task.port(p.name).reader
+                        sleep(0.3)
+                        sample = port_r.read
+                        if sample
+                            handle_port_transformation_association(pt)
+                        end
+                    end
                 end
-                $scanned_tasks << tn
             end
-            sleep(5)
+            
+            #Check if tasks once registered are still available
+            to_remove = $producer_proxys.map{|p| p if not p.reachable?}.compact #Candicdates to remove
+            $producer_proxys.select!{|p| p.reachable?}#Keep the reachable tasks
+            puts "Registered tasks: #{$producer_proxys.map{|t| t.name}}"
+            to_remove.each do |candidate| # Also remove ids
+                puts "task #{candidate.name} is not reachable anymore"
+                $producers.select! {|l| not l.start_with? candidate.name}
+            end
+            sleep(1)
         end
-    end
+    #end
 
     Vizkit.exec
 end
