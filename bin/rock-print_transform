@@ -31,6 +31,8 @@ def print_transform(sample)
     end
     if $with_orientation
         puts "%-17s: %.5f, %.5f, %.5f, %.5f" % ["orientation", sample.orientation.x, sample.orientation.y, sample.orientation.z, sample.orientation.w]
+        euler = sample.orientation.to_euler
+        puts "%-17s: %.5f, %.5f, %.5f" % ["euler", euler[0], euler[1], euler[2]]
     end
     if $with_velocity
         puts "%-17s: %.5f, %.5f, %.5f" % ["velocity", sample.velocity.x, sample.velocity.y, sample.velocity.z]
