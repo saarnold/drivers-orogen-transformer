@@ -60,6 +60,14 @@ task_context "TransformationMonitor" do
     #end
 end
 
+task_context "TransformationProxy" do
+    input_port "input", "/base/samples/RigidBodyState"
+    output_port "output", "/base/samples/RigidBodyState"
+
+    port_driven 'input'
+end
+
+
 simple_deployment 'transformer_broadcaster', 'transformer::Task'
 
 deployment 'transformation_monitor' do
