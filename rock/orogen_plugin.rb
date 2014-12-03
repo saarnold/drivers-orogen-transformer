@@ -40,7 +40,7 @@ module TransformerPlugin
 	{
 	    _nextStatusTime = curTime + statusPeriod;
 	    _#{config.name}_stream_aligner_status.write(_#{config.name}.getStatus());
-            updateTransformerStatus();
+            _#{config.name}_status.write(_transformer.getTransformerStatus());
 	}
     }
     while(_#{config.name}.step());")
@@ -64,7 +64,6 @@ module TransformerPlugin
 	    task.add_base_header_code("#include <transformer/Transformer.hpp>", true)
 
             needed_transformations = config.needed_transformations.sort_by { |t| [t.from, t.to] }
-            status_update_code = []
 	    needed_transformations.each_with_index do |t, i|
                 # BIG FAT WARNING: the key used here for #add_base_member MUST
                 # be lexicographically bigger than "transformer" to make sure
@@ -72,17 +71,7 @@ module TransformerPlugin
                 # members
 		task.add_base_member("transformer_transformation", member_name(t), "transformer::Transformation &").
 		    initializer("#{member_name(t)}(_#{config.name}.registerTransformation(\"#{t.from}\", \"#{t.to}\"))")
-                status_update_code << "#{member_name(t)}.updateStatus(transformerStatus.transformations[#{base_status_index + i}]);"
 	    end
-            if is_root
-                status_update_code << "transformerStatus.time = base::Time::now();"
-                status_update_code << "_#{config.name}_status.write(transformerStatus);"
-            else
-                status_update_code.push("#{task.superclass.name}::updateTransformerStatus();")
-            end
-
-            task.add_base_method("void", "updateTransformerStatus").
-                body(status_update_code.join("\n  "))
 
             # Apply the frame selection from the properties inside the configureHook
             frame_selection = config.available_frames.sort.map do |frame_name|
