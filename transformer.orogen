@@ -2,7 +2,7 @@ name "transformer"
 
 import_types_from "base"
 import_types_from "BroadcastTypes.hpp"
-import_types_from "TransformerStatus.hpp"
+import_types_from "transformer/TransformationStatus.hpp"
 typekit do
     # This one is actually for the transformer plugin, but we want to avoid
     # adding a new package just for that
