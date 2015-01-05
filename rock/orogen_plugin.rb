@@ -714,28 +714,8 @@ module TransformerPlugin
                 task.input_port('dynamic_transformations', '/base/samples/RigidBodyState').
                     multiplexes.
                     needs_reliable_connection
-                    
-                #add method to request needed transformations
-                transformationBody = "
-    std::vector<base::samples::RigidBodyState > ret;
-    const std::vector<transformer::Transformation *> &transformations(_transformer.getRegisteredTransformations());
-    ret.reserve(transformations.size());
-    
-    for(std::vector<transformer::Transformation *>::const_iterator transform = transformations.begin();
-        transform != transformations.end(); transform++)
-    {
-        base::samples::RigidBodyState curTr;
-        curTr.sourceFrame = (*transform)->getSourceFrame();
-        curTr.targetFrame = (*transform)->getTargetFrame();
-        
-        ret.push_back(curTr);
-    }
-    
-    return ret;"
-                task.hidden_operation("getNeededTransformations", transformationBody).
-                    returns('std::vector<base::samples::RigidBodyState>')
             end
-                
+
             # Add period property for every data stream
             streams.each do |stream|
                 property_name = "#{stream.name}_period"
@@ -753,6 +733,32 @@ module TransformerPlugin
                         doc("the global name that should be used for the internal #{name} frame")
                 end
             end
+            
+            #also do frame mapping in case the transformations are requested
+            frame_selection = configurable_frames.sort.map do |frame_name|
+                "    _#{name}.setFrameMapping(\"#{frame_name}\", _#{frame_name}_frame);"
+            end.compact
+            #add method to request needed transformations
+            transformationBody = frame_selection.join("\n") + " \n
+    std::vector<base::samples::RigidBodyState > ret;
+    const std::vector<transformer::Transformation *> &transformations(_transformer.getRegisteredTransformations());
+    ret.reserve(transformations.size());
+    
+    for(std::vector<transformer::Transformation *>::const_iterator transform = transformations.begin();
+        transform != transformations.end(); transform++)
+    {
+        base::samples::RigidBodyState curTr;
+        curTr.sourceFrame = (*transform)->getSourceFrame();
+        curTr.targetFrame = (*transform)->getTargetFrame();
+        
+        ret.push_back(curTr);
+    }
+    
+    return ret;"
+
+            task.hidden_operation("getNeededTransformations", transformationBody).
+                returns('std::vector<base::samples::RigidBodyState>')
+
         end
 
         # Lists the frames for which a configuration interface should be
