@@ -274,11 +274,13 @@ module Orocos
         @transformer ||= ::Transformer::RuntimeSetup.new
     end
 
-    class InputPort
+    class Port
         include ::Transformer::PortExtension
     end
 
-    class OutputPort
-        include ::Transformer::PortExtension
+    module Log
+        class OutputPort
+            include ::Transformer::PortExtension
+        end
     end
 end
