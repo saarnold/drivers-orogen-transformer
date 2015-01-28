@@ -12,6 +12,10 @@ module Transformer
     # transformer's loading mechanisms
     module BundleLoadMechanismOverride
         def load(*conf)
+            if File.file?(path = File.join(*conf))
+                return super(path)
+            end
+
             args = conf + [:order => :specific_first]
             file = Roby.app.find_file(*args)
             if !file
