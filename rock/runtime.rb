@@ -36,6 +36,10 @@ module Transformer
 
         def initialize
             Orocos.load_typekit('transformer')
+            reset
+        end
+
+        def reset
             @configuration_state = Types::Transformer::ConfigurationState.new
             @manager = Transformer::TransformationManager.new
         end
