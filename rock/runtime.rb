@@ -12,6 +12,10 @@ module Transformer
     # transformer's loading mechanisms
     module BundleLoadMechanismOverride
         def load(*conf)
+            if File.file?(path = File.join(*conf))
+                return super(path)
+            end
+
             args = conf + [:order => :specific_first]
             file = Roby.app.find_file(*args)
             if !file
@@ -36,6 +40,10 @@ module Transformer
 
         def initialize
             Orocos.load_typekit('transformer')
+            reset
+        end
+
+        def reset
             @configuration_state = Types::Transformer::ConfigurationState.new
             @manager = Transformer::TransformationManager.new
         end
