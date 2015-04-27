@@ -8,6 +8,8 @@ typekit do
     # adding a new package just for that
     export_types '/std/vector</base/samples/RigidBodyState>'
     export_types '/transformer/TransformerStatus'
+    export_types '/transformer/TransformationDescription'
+    export_types '/std/vector</transformer/TransformationDescription>'
 end	
 
 # Task that allows to broadcast transformer information, mostly used for GUI

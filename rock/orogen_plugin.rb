@@ -51,7 +51,7 @@ module TransformerPlugin
         end
 
 	def generate(task, config)
-            task.project.using_library('transformer', :typekit => false)
+            task.project.using_library('transformer', :typekit => true)
             port_listener_ext = task.extension("port_listener", false)
 
             if !(tr = config.task.superclass.find_extension('transformer')) || !tr.needs_transformer?
@@ -734,14 +734,14 @@ module TransformerPlugin
             end.compact
             #add method to request needed transformations
             transformationBody = frame_selection.join("\n") + " \n
-    std::vector<base::samples::RigidBodyState > ret;
+    std::vector<transformer::TransformationDescription > ret;
     const std::vector<transformer::Transformation *> &transformations(_transformer.getRegisteredTransformations());
     ret.reserve(transformations.size());
     
     for(std::vector<transformer::Transformation *>::const_iterator transform = transformations.begin();
         transform != transformations.end(); transform++)
     {
-        base::samples::RigidBodyState curTr;
+        transformer::TransformationDescription curTr;
         curTr.sourceFrame = (*transform)->getSourceFrame();
         curTr.targetFrame = (*transform)->getTargetFrame();
         
@@ -751,7 +751,7 @@ module TransformerPlugin
     return ret;"
 
             task.hidden_operation("getNeededTransformations", transformationBody).
-                returns('std::vector<base::samples::RigidBodyState>')
+                returns('std::vector<transformer::TransformationDescription>')
 
         end
 

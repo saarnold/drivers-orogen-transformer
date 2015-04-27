@@ -6,6 +6,13 @@
 #include <vector>
 
 namespace transformer {
+    
+    struct TransformationDescription
+    {
+        std::string sourceFrame;
+        std::string targetFrame;
+    };
+    
     struct PortFrameAssociation
     {
         std::string task;
