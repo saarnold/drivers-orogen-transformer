@@ -728,12 +728,18 @@ module TransformerPlugin
                 end
             end
             
+            task.hidden_operation("getNeededTransformations").
+                returns('std::vector<transformer::TransformationDescription>')
+
+        end
+        
+        def get_transform_code
             #also do frame mapping in case the transformations are requested
             frame_selection = configurable_frames.sort.map do |frame_name|
                 "    _#{name}.setFrameMapping(\"#{frame_name}\", _#{frame_name}_frame);"
             end.compact
             #add method to request needed transformations
-            transformationBody = frame_selection.join("\n") + " \n
+            frame_selection.join("\n") + " \n
     std::vector<transformer::TransformationDescription > ret;
     const std::vector<transformer::Transformation *> &transformations(_transformer.getRegisteredTransformations());
     ret.reserve(transformations.size());
@@ -749,10 +755,6 @@ module TransformerPlugin
     }
     
     return ret;"
-
-            task.hidden_operation("getNeededTransformations", transformationBody).
-                returns('std::vector<transformer::TransformationDescription>')
-
         end
 
         # Lists the frames for which a configuration interface should be
@@ -795,12 +797,22 @@ module TransformerPlugin
         def needs_transformer?
             !needed_transformations.empty? || !streams.empty? || supercall(nil, :needs_transformer?)
         end
+        
+        
+        # Called by the oroGen C++ code generator to add code objects to the
+        # task implementation
+        def early_register_for_generation(task)
+            if needs_transformer?
+                task.operation('get_transform_code').
+                    base_body(get_transform_code)
+            end
+        end
 
         # Called by the oroGen C++ code generator to add code objects to the
         # task implementation
         def register_for_generation(task)
             if needs_transformer?
-                Generator.new.generate(task, self)
+                gen.generate(task, self)
             end
         end
 
