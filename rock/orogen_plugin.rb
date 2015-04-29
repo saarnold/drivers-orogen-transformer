@@ -732,11 +732,7 @@ module TransformerPlugin
                     task.property("#{name}_frame", "/std/string", name).
                         doc("the global name that should be used for the internal #{name} frame")
                 end
-            end
-            
-            task.hidden_operation("getNeededTransformations").
-                returns('std::vector<transformer::TransformationDescription>')
-
+            end            
         end
         
         def get_transform_code
@@ -809,8 +805,9 @@ module TransformerPlugin
         # task implementation
         def early_register_for_generation(task)
             if needs_transformer?
-                task.operation('get_transform_code').
-                    base_body(get_transform_code)
+                task.hidden_operation("getNeededTransformations").
+                    base_body(get_transform_code).
+                    returns('std::vector<transformer::TransformationDescription>')
             end
         end
 
@@ -818,7 +815,7 @@ module TransformerPlugin
         # task implementation
         def generation_hook(task)
             if needs_transformer?
-                gen.generate(task, self)
+                Generator.new.generate(task, self)
             end
         end
 
