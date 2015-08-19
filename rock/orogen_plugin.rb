@@ -772,7 +772,7 @@ module TransformerPlugin
 
         # Called by the oroGen C++ code generator to add code objects to the
         # task implementation
-        def register_for_generation(task)
+        def generation_hook(task)
             if needs_transformer?
                 Generator.new.generate(task, self)
             end
