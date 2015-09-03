@@ -831,12 +831,17 @@ class Orocos::Spec::TaskContext
 
     def transformer(&block)
         if !block_given?
-            return find_extension("transformer")
+            if self_ext = find_extension("transformer", false)
+                return self_ext
+            elsif inherited = find_extension("transformer", true)
+                return TransformerPlugin::Extension.new("transformer", self)
+            else return
+            end
         end
 
         if !(config = find_extension("transformer", false))
             config = TransformerPlugin::Extension.new("transformer", self)
-            if tr = superclass.find_extension("transformer")
+            if (tr = superclass.find_extension("transformer")) && tr.max_latency
                 config.max_latency tr.max_latency
             end
             PortListenerPlugin.add_to(self)
