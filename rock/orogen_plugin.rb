@@ -387,6 +387,7 @@ module TransformerPlugin
                     available_frames << name.to_str
                 end
             end
+            available_frames
         end
 
         # Declares that the provided frames should be configurable, i.e. that
