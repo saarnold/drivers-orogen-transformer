@@ -387,6 +387,7 @@ module TransformerPlugin
                     available_frames << name.to_str
                 end
             end
+            available_frames
         end
 
         # Declares that the provided frames should be configurable, i.e. that
@@ -523,14 +524,16 @@ module TransformerPlugin
         # #transform_input, returns it. Otherwise, returns nil
         def find_transform_of_port(port)
             if port.respond_to?(:name)
-                port = task.find_port(port.name)
-            else
-                port = task.find_port(port)
+                port_name = port.name
+            else port_name = port
             end
+            port = task.find_port(port_name)
 
-            if result = (transform_inputs[port] || transform_outputs[port])
+            if !port
+                raise ArgumentError, "#{task} has no port called #{port_name}"
+            elsif result = (transform_inputs[port] || transform_outputs[port])
                 result
-            else
+            elsif (supertask = supercall(nil, :task)) && supertask.has_port?(port_name)
                 supercall(nil, :find_transform_of_port, port)
             end
         end
@@ -830,12 +833,17 @@ class Orocos::Spec::TaskContext
 
     def transformer(&block)
         if !block_given?
-            return find_extension("transformer")
+            if self_ext = find_extension("transformer", false)
+                return self_ext
+            elsif inherited = find_extension("transformer", true)
+                return TransformerPlugin::Extension.new("transformer", self)
+            else return
+            end
         end
 
         if !(config = find_extension("transformer", false))
             config = TransformerPlugin::Extension.new("transformer", self)
-            if tr = superclass.find_extension("transformer")
+            if (tr = superclass.find_extension("transformer")) && tr.max_latency
                 config.max_latency tr.max_latency
             end
             PortListenerPlugin.add_to(self)
