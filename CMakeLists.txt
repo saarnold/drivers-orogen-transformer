@@ -8,10 +8,6 @@ install(FILES ${PROJECT_SOURCE_DIR}/rock/orogen_plugin.rb
         DESTINATION ${CMAKE_INSTALL_PREFIX}/share/orogen/plugins
         RENAME transformer_plugin.rb)
 
-install(FILES ${PROJECT_SOURCE_DIR}/rock/roby_plugin.rb
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/share/orogen/plugins/roby
-        RENAME transformer_plugin.rb)
-
 find_package(Rock)
 include(RockRuby)
 # Install a transformer/runtime file, which will be loaded by orocos.rb whenever
