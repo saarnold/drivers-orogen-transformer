@@ -1,5 +1,6 @@
 name "transformer"
 
+using_library "transformer"
 import_types_from "base"
 import_types_from "BroadcastTypes.hpp"
 import_types_from "transformer/TransformationStatus.hpp"
