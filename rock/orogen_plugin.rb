@@ -62,6 +62,7 @@ module TransformerPlugin
             base_status_index = config.supercall([], :each_needed_transformation).to_a.size
             task.in_base_hook("configure", "    transformerStatus.transformations.resize(#{base_status_index + config.needed_transformations.size()});")
 	    task.add_base_header_code("#include <transformer/Transformer.hpp>", true)
+            task.add_base_header_code("#include <aggregator/DetermineSampleTimestamp.hpp>", true)
 
             needed_transformations = config.needed_transformations.sort_by { |t| [t.from, t.to] }
 	    needed_transformations.each_with_index do |t, i|
@@ -90,8 +91,8 @@ module TransformerPlugin
                     # This needs fixing by annotating opaques (i.e. telling
                     # oroGen that some opaques 'behave as' pointers)
                     time_access =
-                        if stream_data_type =~ /ReadOnlyPointer/ then "#{sample_name}->time"
-                        else "#{sample_name}.time"
+                        if stream_data_type =~ /ReadOnlyPointer/ then "aggregator::determineTimestamp(*#{sample_name})"
+                        else "aggregator::determineTimestamp(#{sample_name})"
                         end
 
                     "	_#{config.name}.pushData(#{idx_name(stream)}, #{time_access}, #{sample_name});"
