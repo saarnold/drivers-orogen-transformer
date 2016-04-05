@@ -39,7 +39,9 @@ module TransformerPlugin
 	if( curTime > _nextStatusTime )
 	{
 	    _nextStatusTime = curTime + statusPeriod;
-	    _#{config.name}_stream_aligner_status.write(_#{config.name}.getStatus());
+            ::aggregator::StreamAlignerStatus stream_aligner_status = _#{config.name}.getStatus();
+            stream_aligner_status.name = getName();
+	    _#{config.name}_stream_aligner_status.write(stream_aligner_status);
             _#{config.name}_status.write(_transformer.getTransformerStatus());
 	}
     }
