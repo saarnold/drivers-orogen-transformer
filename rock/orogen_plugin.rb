@@ -313,6 +313,9 @@ module TransformerPlugin
         # [Map<Orocos::Spec::Port, String>] associations between port and
         # frames. See #associate_frame_to_ports
         attr_reader :frame_associations
+        # [Map<Orocos::Spec::Port, (String,String)>] associations between port and
+        # transformations. See #associate_transform_to_ports
+        attr_reader :transform_associations
         # [Array<NeededTransformations> the list of transformations that should
         # be provided by the transformer at runtime
 	attr_reader :needed_transformations
@@ -338,6 +341,7 @@ module TransformerPlugin
             @default = true
             @available_frames = Set.new
             @frame_associations = Hash.new
+            @transform_associations = Hash.new
 
 	    @needed_transformations = Array.new
             @transform_outputs = Hash.new
@@ -468,16 +472,14 @@ module TransformerPlugin
             supercall(nil, :each_transform_input, &block)
         end
 
-        # Enumerates all input and output transform ports
+        # Enumerates all ports that are associated with a transform
         #
         # @yieldparam [Orocos::Spec::Port] port
         # @yieldparam [TransformationPort] transformation
         def each_transform_port(&block)
-            if !block
-                return enum_for(:each_transform_port)
-            end
-            each_transform_input(&block)
-            each_transform_output(&block)
+            return enum_for(__method__) if !block_given?
+            transform_associations.each(&block)
+            supercall(nil, :each_transform_port, &block)
         end
 
         # Enumerates all transformations that the transformer should make
@@ -534,7 +536,7 @@ module TransformerPlugin
 
             if !port
                 raise ArgumentError, "#{task} has no port called #{port_name}"
-            elsif result = (transform_inputs[port] || transform_outputs[port])
+            elsif result = transform_associations[port]
                 result
             elsif (supertask = supercall(nil, :task)) && supertask.has_port?(port_name)
                 supercall(nil, :find_transform_of_port, port)
@@ -564,18 +566,28 @@ module TransformerPlugin
             supercall(nil, :each_annotated_port, &block)
         end
 
+        # @deprecated use #associate_ports_to_frame instead
+        def associate_frame_to_ports(frame_name, *port_names)
+            Transformer.warn "#associate_frame_to_ports is deprecated, use #associate_ports_to_frame instead"
+            associate_ports_to_frame(*port_names, frame_name)
+        end
+
+        # @!method associate_ports_to_frame(port1[, port2, ...], frame_name)
+        #
         # Associates the provided ports (inputs and/or outputs) to the given
         # frame
-        #
-        # This declaration announces that the data flowing through the specified
-        # ports is represented in the given frame
-        def associate_frame_to_ports(frame_name, *port_names)
-            frames(frame_name)
-            port_names.each do |pname|
-                if !task.has_port?(pname)
-                    raise ArgumentError, "task #{task.name} has no port called #{pname}"
+        def associate_ports_to_frame(*ports_and_frame)
+            if ports_and_frame.size < 2
+                raise ArgumentError, "expected at least 2 arguments, got only #{ports_and_frame.size}"
+            end
+            *ports, frame = *ports_and_frame
+
+            frames(frame)
+            ports.each do |port_name|
+                if !task.has_port?(port_name)
+                    raise ArgumentError, "task #{task.name} has no port called #{port_name}"
                 end
-                port = task.find_port(pname)
+                port = task.find_port(port_name)
                 # WARN: do not verify here that +port+ is NOT of type
                 # RigidBodyState. The reason is that some components will
                 # provide transformations between two temporal states of the
@@ -585,7 +597,37 @@ module TransformerPlugin
                 # I.e., for instance, odometry modules provide "incremental
                 # updates", which are the transformations between the odometry
                 # frame at t and the odometry frame at t+1
-                frame_associations[port] = frame_name
+                frame_associations[port] = frame
+            end
+        end
+
+        # @!method associate_ports_to_transform(port1[, port2, ...], source_frame => target_frame)
+        #
+        # Associate the given ports to a transform
+        #
+        # Unlike {#transform_input}, the data coming from the port is not
+        # assumed to be fed to the transformer inside the component. This means
+        # that the same transform might be provided to the underlying component
+        # if needed
+        def associate_ports_to_transform(*ports_and_transform)
+            if ports_and_transform.size < 2
+                raise ArgumentError, "expected at least 2 arguments, got only #{ports_and_transform.size}"
+            end
+            *ports, transform = *ports_and_transform
+            if !transform.kind_of?(Hash)
+                raise ArgumentError, "expected the last argument to be a hash representing the transform"
+            elsif transform.size != 1
+                raise ArgumentError, "expected the last argument to be a hash representing a single transform"
+            end
+
+            transform = transform.first
+            frames(*transform)
+            ports.each do |port_name|
+                if !task.has_port?(port_name)
+                    raise ArgumentError, "task #{task.name} has no port called #{port_name}"
+                end
+                port = task.find_port(port_name)
+                transform_associations[port] = TransformationPort.new(*transform, port)
             end
         end
 
@@ -637,6 +679,7 @@ module TransformerPlugin
             if !task.has_input_port?(port_name)
                 raise ArgumentError, "task #{task.name} has no input port called #{port_name}"
             end
+            associate_ports_to_transform(port_name, transform)
             spec = transform_port(port_name, transform)
             transform_inputs[task.find_input_port(port_name)] = spec
             TransformationConfigurationProxy.new(self, spec)
@@ -648,6 +691,7 @@ module TransformerPlugin
             if !task.has_output_port?(port_name)
                 raise ArgumentError, "task #{task.name} has no output port called #{port_name}"
             end
+            associate_ports_to_transform(port_name, transform)
             spec = transform_port(port_name, transform)
             transform_outputs[task.find_output_port(port_name)] = spec
             TransformationConfigurationProxy.new(self, spec)
