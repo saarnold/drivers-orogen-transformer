@@ -44,7 +44,7 @@ module Transformer
         end
 
         def reset
-            @configuration_state = Types::Transformer::ConfigurationState.new
+            @configuration_state = Types.transformer.ConfigurationState.new
             @manager = Transformer::TransformationManager.new
         end
 
@@ -164,7 +164,7 @@ module Transformer
             end
 
             task.static_transformations = needed_static_transforms.each_value.map do |static|
-                rbs = Types::Base::Samples::RigidBodyState.invalid
+                rbs = Types.base.samples.RigidBodyState.invalid
                 rbs.sourceFrame = static.from
                 rbs.targetFrame = static.to
                 rbs.position = static.translation
@@ -187,7 +187,7 @@ module Transformer
             configuration_state.static_transformations =
                 manager.conf.
                     enum_for(:each_static_transform).map do |static|
-                        rbs = Types::Base::Samples::RigidBodyState.invalid
+                        rbs = Types.base.samples.RigidBodyState.invalid
                         rbs.sourceFrame = static.from
                         rbs.targetFrame = static.to
                         rbs.position = static.translation
@@ -206,8 +206,9 @@ module Transformer
                 begin
                     producer_port = resolve_producer(dyn)
                     configuration_state.port_transformation_associations <<
-                        Types::Transformer::PortTransformationAssociation.new(:task => producer_port.task.name, :port => producer_port.name,
-                                                                         :from_frame => dyn.from, :to_frame => dyn.to)
+                        Types.transformer.PortTransformationAssociation.new(
+                            task: producer_port.task.name, port: producer_port.name,
+                            from_frame: dyn.from, to_frame: dyn.to)
                 rescue Orocos::NotFound
                 end
             end
@@ -216,13 +217,13 @@ module Transformer
                 task.each_input_port do |p|
                     if p.frame
                         configuration_state.port_frame_associations <<
-                            Types::Transformer::PortFrameAssociation.new(:task => task.name, :port => p.name, :frame => p.frame)
+                            Types.transformer.portFrameAssociation.new(task: task.name, port: p.name, frame: p.frame)
                     end
                 end
                 task.each_output_port do |p|
                     if p.frame
                         configuration_state.port_frame_associations <<
-                            Types::Transformer::PortFrameAssociation.new(:task => task.name, :port => p.name, :frame => p.frame)
+                            Types.transformer.PortFrameAssociation.new(task: task.name, port: p.name, frame: p.frame)
                     end
                 end
             end
