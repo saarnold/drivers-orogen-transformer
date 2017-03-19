@@ -293,7 +293,7 @@ module TransformerPlugin
             end
         end
 
-        def name; "transformer" end
+        def name; "transformer".freeze end
 	
         attr_predicate :default?, true
 
