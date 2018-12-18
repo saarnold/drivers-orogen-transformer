@@ -2,6 +2,10 @@
 # It gets loaded by orocos.rb whenever an extension called "transformer" is
 # found on one of the oroGen task models
 
+# Make sure this is loaded since we monkey patch classes in Orocos and Orocos::Log
+require 'orocos'
+require 'orocos/log'
+
 module Transformer
     # Module used to add port-frame declarations on ports
     module PortExtension
@@ -282,14 +286,13 @@ module Orocos
     def self.transformer
         @transformer ||= ::Transformer::RuntimeSetup.new
     end
-
-    class Port
-        include ::Transformer::PortExtension
-    end
-
-    module Log
-        class OutputPort
-            include ::Transformer::PortExtension
-        end
-    end
 end
+
+class Orocos::Port
+    include ::Transformer::PortExtension
+end
+
+class Orocos::Log::OutputPort
+    include ::Transformer::PortExtension
+end
+
